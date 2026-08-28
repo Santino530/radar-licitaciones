@@ -147,6 +147,30 @@ def es_ruido(texto):
     return any(p in t for p in RUIDO_PATRONES)
 
 
+def recolectar(incluir_ruido=True, verbose=False):
+    """Devuelve una lista de dicts normalizados de PBAC. La usa el orquestador
+    (src/radar.py) y tambien main() de este script.
+
+    Campos: nro_proceso, nombre, tipo, fecha_apertura, estado, unidad_ejecutora,
+    keywords_match, es_ruido.
+    """
+    body = descargar_reporte_xlsx()
+    procesos = leer_xlsx(body)
+    hits = []
+    for r in procesos:
+        m = matchea(r)
+        if not m:
+            continue
+        r["keywords_match"] = ",".join(m)
+        r["es_ruido"] = es_ruido(r["nombre"] + " " + r["unidad_ejecutora"])
+        hits.append(r)
+    if not incluir_ruido:
+        hits = [r for r in hits if not r["es_ruido"]]
+    if verbose:
+        print(f"   pbac: {len(hits)} filas (de {len(procesos)} procesos abiertos)")
+    return hits
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--incluir-ruido", action="store_true")

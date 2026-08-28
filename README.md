@@ -103,27 +103,32 @@ de apertura, estado y link al pliego.
 - **Lenguaje:** a definir al escribir el MVP (Python es lo que ya se usó en
   `busqueda-clientes-potenciales`).
 
-## 9. Estado actual
+## 9. Estado actual (2026-08-28)
 
-- **Fuentes relevadas (2026-08-27):** ver `docs/fuentes-y-adquisicion.md` y
-  `data/fuentes_objetivo.csv` (26 fuentes clasificadas). SIBOM probado y funcionando.
-- Decidido: build propio + runner en GitHub Actions. Alcance: sólo sector público.
-- Bajadas las 3 hojas relevantes de la Google Sheet a `data/planilla_*.csv`.
-- **Todavía no hay código.** Falta el MVP.
+- **Fuentes relevadas:** `docs/fuentes-y-adquisicion.md`, `docs/inventario-fuentes-completo.md`,
+  `data/fuentes_objetivo.csv`.
+- **Conectores funcionando:**
+  - `src/sibom_mvp.py` — boletines de los ~135 municipios de PBA. Grupos "objetivo"
+    (AMBA) y "volumen_alto" (partidos del interior con Dirección Vial grande), filtro de
+    ruido, ventana de días.
+  - `src/pbac_mvp.py` — "apertura próxima" de toda la Provincia, vía el botón
+    "Descargar Reporte Excel" (una request → xlsx con ~467 procesos).
+- **Motor / orquestador:** `src/radar.py` corre todos los conectores, normaliza a
+  `data/radar_sin_verificar.csv` y marca lo **nuevo respecto de la corrida anterior**
+  (`primera_vez_visto` = "nueva apertura").
+- **Automatización:** `.github/workflows/radar.yml` — corre `radar.py` 3 veces por día
+  (09/13/18 hs ART) y commitea el CSV. **Se activa cuando el repo se suba a GitHub.**
+- **Falta:** conectores de boletines oficiales (Provincia/CABA/Nación), dashboard web +
+  notificación push, y subir el repo a GitHub.
 
 ## 10. Próximos pasos
 
-1. **MVP del conector `sibom`:** script que busca las palabras clave con `type=Licitación`
-   en 3 municipios de prueba (uno con portal propio, uno RAFAM, uno sin portal) y saca la
-   lista a un CSV. Medir: ¿cuántos resultados reales trae?, ¿el texto está en HTML o PDF?,
-   ¿cuánto ruido?
-2. Armar `data/sibom_city_ids.csv` (diccionario `city_id → municipio`, desde
-   `sibom.slyt.gba.gob.ar/cities`) con los municipios de zona operable.
-3. Ajustar palabras clave y buscar el código de rubro "Cubiertas y Cámaras" en PBAC.
-4. Sumar el conector `pbac` y comparar: ¿qué licitaciones trae PBAC que no estén en SIBOM?
-5. Definir el schema final de `radar_sin_verificar.csv` y `pipeline.csv`.
-6. Recién ahí: workflow de GitHub Actions + dashboard + notificación.
-7. Confirmar con la empresa con qué CUIT / sector (San Justo Neumáticos S.R.L. o Centro
+1. Subir el repo a un GitHub privado y probar el workflow con "Run workflow" a mano.
+2. Conector de boletines oficiales: Boletín Oficial PBA, Boletín Oficial CABA, BORA
+   (Nación) + datos abiertos OCDS de CABA.
+3. Afinar filtros de ruido y palabras clave con lo que vaya juntando el radar.
+4. Dashboard web (Artifact) + `PushNotification`, reusando el molde de `busqueda-laboral`.
+5. Confirmar con la empresa con qué CUIT / sector (San Justo Neumáticos S.R.L. o Centro
    Integral de Neumáticos) se presenta a licitaciones.
 
 ---
@@ -132,15 +137,23 @@ de apertura, estado y link al pliego.
 
 ```text
 /radar-licitaciones
-    README.md          ← este archivo
+    README.md
+    .github/workflows/radar.yml   ← corre el motor 3x/día (al subir a GitHub)
     /docs
-        decisiones.md            ← registro de decisiones
-        fuentes-y-adquisicion.md ← análisis de fuentes y método de lectura
-        blueprint-referencia.md  ← molde del sistema de busqueda-laboral
+        decisiones.md
+        fuentes-y-adquisicion.md
+        inventario-fuentes-completo.md
+        blueprint-referencia.md
     /data
-        fuentes_objetivo.csv     ← fuentes clasificadas por tipo de conector
-        planilla_*.csv           ← hojas exportadas de la Google Sheet de prospectos
-    /src               ← código (se crea al arrancar el MVP)
+        fuentes_objetivo.csv          ← fuentes clasificadas por tipo de conector
+        proveedores_conocidos.csv     ← proveedores/competidores que ya venden al Estado
+        sibom_city_ids.csv            ← municipio → id en SIBOM
+        radar_sin_verificar.csv       ← salida del motor (lo que hay que verificar)
+        planilla_*.csv                ← export de la Google Sheet (ignorado por git)
+    /src
+        radar.py       ← orquestador: corre todo y arma radar_sin_verificar.csv
+        sibom_mvp.py    ← conector SIBOM
+        pbac_mvp.py     ← conector PBAC
 ```
 
 ### Relación con otros proyectos

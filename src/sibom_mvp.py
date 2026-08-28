@@ -184,13 +184,24 @@ def parse_results(page_html):
     return out
 
 
+def fetch_reintentos(url, intentos=3):
+    for i in range(1, intentos + 1):
+        try:
+            return fetch(url)
+        except Exception as e:  # noqa: BLE001  (server lento/inestable)
+            if i == intentos:
+                raise
+            print(f"  . reintento {i} ({e})", file=sys.stderr)
+            time.sleep(3 * i)
+
+
 def search_keyword(kw, max_pages=10, pause=1.0):
     results = []
     for page in range(1, max_pages + 1):
         params = {"utf8": "✓", "q[simple_query_string]": kw, "page": str(page)}
         url = f"{BASE}/search?" + urllib.parse.urlencode(params)
         try:
-            h = fetch(url)
+            h = fetch_reintentos(url)
         except Exception as e:  # noqa: BLE001
             print(f"  ! error en '{kw}' pagina {page}: {e}", file=sys.stderr)
             break
@@ -210,6 +221,49 @@ def to_date(s):
         return dt.datetime.strptime(s, "%d/%m/%Y").date()
     except ValueError:
         return None
+
+
+def recolectar(desde=None, max_pages=8, solo_zona=True, incluir_ruido=True,
+               verbose=False):
+    """Devuelve una lista de dicts normalizados de SIBOM. La usa el orquestador
+    (src/radar.py) y tambien main() de este script.
+
+    Campos de cada dict: municipio, categoria_zona, es_ruido, fecha_publicacion,
+    titulo, url, tags, keywords (set), fragmento.
+    """
+    corte = None
+    if isinstance(desde, str):
+        corte = dt.datetime.strptime(desde, "%Y-%m-%d").date()
+    elif isinstance(desde, dt.date):
+        corte = desde
+
+    by_url = {}
+    for kw in KEYWORDS:
+        for r in search_keyword(kw, max_pages=max_pages):
+            if r["url"] in by_url:
+                by_url[r["url"]]["keywords"].add(kw)
+            else:
+                r["keywords"] = {kw}
+                by_url[r["url"]] = r
+
+    rows = list(by_url.values())
+    for r in rows:
+        r["municipio"] = r["municipio"]
+        r["categoria_zona"] = clasificar_zona(r["municipio"])
+        r["es_ruido"] = es_ruido(r["titulo"] + " " + r["tags"] + " " + r["fragmento"])
+
+    if solo_zona:
+        rows = [r for r in rows if r["categoria_zona"] in ("objetivo", "volumen_alto")]
+    if corte:
+        rows = [r for r in rows
+                if (d := to_date(r["fecha_publicacion"])) and d >= corte]
+    if not incluir_ruido:
+        rows = [r for r in rows if not r["es_ruido"]]
+
+    rows.sort(key=lambda r: (to_date(r["fecha_publicacion"]) or dt.date.min), reverse=True)
+    if verbose:
+        print(f"   sibom: {len(rows)} filas")
+    return rows
 
 
 def main():

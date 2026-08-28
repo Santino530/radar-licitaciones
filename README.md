@@ -1,0 +1,151 @@
+# Radar de licitaciones
+
+## 1. Qué problema busca resolver
+
+La empresa quiere venderle neumáticos nuevos, recapado y servicio a **municipios y
+organismos públicos**, pero ese canal se compra casi siempre por **licitación**. Hoy
+nadie revisa de forma sistemática qué licitaciones de neumáticos / cubiertas / recapado
+están abiertas en los municipios del AMBA. Cuando alguien se entera, muchas veces ya
+venció el plazo para presentarse. La detección es manual, dispersa y tardía.
+
+Este proyecto es la continuación natural de `busqueda-clientes-potenciales`: en ese
+Excel ya identificamos ~32 municipios/organismos y marcamos que 36 prospectos compran
+por **licitación pública**. Este proyecto se ocupa de **enterarse a tiempo de cada
+llamado** de esos compradores.
+
+## 2. Por qué es relevante para la empresa
+
+- Las flotas municipales (camiones de residuos, volquetes, colectivos, utilitarios) son
+  negocio de **volumen y recurrencia**, exactamente donde el recapado tiene mejor margen.
+- El plazo entre publicación y apertura de una licitación suele ser corto (días). Perder
+  el aviso = perder la oportunidad entera hasta el año siguiente.
+- Un radar que avise "hoy salió esta licitación, vence tal día" permite que la empresa
+  llegue a presentarse **preparada** en vez de a las corridas o directamente afuera.
+
+## 3. Objetivo
+
+Una **web propia que se actualiza sola todos los días** y muestra las licitaciones
+públicas **activas** relacionadas con neumáticos / recapado / gomería de los municipios
+y organismos que ya están en el Excel `Prospeccion_Clientes_Flotas.xlsx`, con su fecha
+de apertura, estado y link al pliego.
+
+## 4. Alcance
+
+**Incluye:**
+- Los municipios y organismos del AMBA que figuran en la hoja *Prospectos* del Excel
+  (los que tienen *Modalidad de compra = licitación pública*).
+- Licitaciones, contrataciones y compras cuyo objeto sea neumáticos, cubiertas, cámaras,
+  llantas, recapado / recauchutaje, o servicio de gomería (alineación, balanceo,
+  reparación de cubiertas).
+- Un panel diario con: comprador, número y objeto del llamado, fecha de publicación,
+  fecha de apertura, estado (abierta / por vencer / cerrada) y link a la fuente oficial.
+
+**No incluye (por ahora):**
+- Armar la oferta / preparar la documentación para presentarse (eso es trabajo del
+  equipo comercial y administración).
+- Licitaciones privadas y de flotas privadas (eso ya se trabaja desde el Excel).
+- Provincias fuera del AMBA.
+- Decidir bajo qué sector se presenta la empresa (**San Justo Neumáticos S.R.L.** o
+  **Centro Integral de Neumáticos**): el radar sólo informa; la decisión es de los dueños.
+
+## 5. Usuarios
+
+- **Dueños / responsable comercial:** miran el panel para decidir a qué llamados vale la
+  pena presentarse.
+- **Administración:** usa la fecha de apertura y el link al pliego para preparar la
+  presentación en término.
+
+## 6. Información necesaria
+
+| Dato | Fuente | Estado |
+|---|---|---|
+| Lista de municipios/organismos objetivo | Hoja *Prospectos* del Excel `Prospeccion_Clientes_Flotas.xlsx` | Ya existe |
+| Portales de compras públicas donde publican esos municipios | PBAC (Provincia de Bs. As.), SIBOM (boletines oficiales municipales), BAC (CABA), COMPR.AR / CONTRAT.AR (Nación), y el sitio propio de cada municipio | A relevar por municipio |
+| Palabras clave del rubro | neumático(s), cubierta(s), cámara(s), llanta(s), recapado, recauchutaje, gomería, alineación, balanceo | Definido (ajustable) |
+| CUIT / datos de la empresa para registrarse como proveedor en cada portal | Interno | Pendiente de confirmar con la empresa |
+| Cada cuánto publica cada municipio y con qué anticipación | Se aprende observando el radar unas semanas | Pendiente |
+
+## 7. Funcionamiento esperado
+
+1. Una vez por día, un proceso automático recorre los portales de compras públicas y los
+   sitios de los municipios objetivo.
+2. Filtra las publicaciones nuevas por las palabras clave del rubro.
+3. Guarda las que coinciden en una base (comprador, objeto, fechas, link, estado).
+4. Marca el estado según la fecha de apertura: **abierta**, **por vencer** (faltan ≤ X
+   días) o **cerrada**.
+5. La web muestra la lista ordenada por urgencia (las que están por vencer arriba).
+6. *(Etapa posterior)* además del panel, un aviso diario por mail / WhatsApp con lo nuevo
+   y lo que está por vencer.
+
+## 8. Tecnologías y arquitectura (decidido 2026-08-27)
+
+> El usuario no es programador avanzado: cada decisión técnica se explica antes de
+> implementarla, y se elige siempre la opción más simple que funcione.
+
+**Se construye el radar propio** (no se contrata un agregador comercial — ver
+`docs/decisiones.md`). Detalle de fuentes en `docs/fuentes-y-adquisicion.md`.
+
+- **Ingesta = conectores por tipo de fuente**, no por municipio:
+  1. `sibom` — boletines de ~135 municipios de PBA (búsqueda GET, filtro `type=Licitación`).
+  2. `pbac` — Provincia + organismos + municipios adheridos.
+  3. `bac_ocds` — datos abiertos de CABA (formato Open Contracting).
+  4. `comprar_ocds` — datos abiertos de Nación (opcional, sólo si entra un organismo nacional).
+  5. `municipal_html` — sólo para huecos comprobados (RAFAM primero, es multi-municipio).
+- **El scraper corre en GitHub Actions** (cron 1–2x/día). Hace `git commit` del CSV del
+  radar. No corre en la rutina de la nube de Anthropic (tiene `WebFetch` bloqueado) ni en
+  la PC de Santino (tendría que estar prendida).
+- **Dashboard + aviso al celular:** se reusa el molde de `busqueda-laboral`
+  (`docs/blueprint-referencia.md`): Artifact publicado + `PushNotification`, disparado por
+  la rutina en la nube o por una sesión interactiva.
+- **MVP (primero):** un script del conector `sibom` que consulta 3 municipios de prueba y
+  devuelve la lista filtrada por palabras clave. Sirve para medir cuánto trae cada fuente
+  antes de armar toda la infra.
+- **Lenguaje:** a definir al escribir el MVP (Python es lo que ya se usó en
+  `busqueda-clientes-potenciales`).
+
+## 9. Estado actual
+
+- **Fuentes relevadas (2026-08-27):** ver `docs/fuentes-y-adquisicion.md` y
+  `data/fuentes_objetivo.csv` (26 fuentes clasificadas). SIBOM probado y funcionando.
+- Decidido: build propio + runner en GitHub Actions. Alcance: sólo sector público.
+- Bajadas las 3 hojas relevantes de la Google Sheet a `data/planilla_*.csv`.
+- **Todavía no hay código.** Falta el MVP.
+
+## 10. Próximos pasos
+
+1. **MVP del conector `sibom`:** script que busca las palabras clave con `type=Licitación`
+   en 3 municipios de prueba (uno con portal propio, uno RAFAM, uno sin portal) y saca la
+   lista a un CSV. Medir: ¿cuántos resultados reales trae?, ¿el texto está en HTML o PDF?,
+   ¿cuánto ruido?
+2. Armar `data/sibom_city_ids.csv` (diccionario `city_id → municipio`, desde
+   `sibom.slyt.gba.gob.ar/cities`) con los municipios de zona operable.
+3. Ajustar palabras clave y buscar el código de rubro "Cubiertas y Cámaras" en PBAC.
+4. Sumar el conector `pbac` y comparar: ¿qué licitaciones trae PBAC que no estén en SIBOM?
+5. Definir el schema final de `radar_sin_verificar.csv` y `pipeline.csv`.
+6. Recién ahí: workflow de GitHub Actions + dashboard + notificación.
+7. Confirmar con la empresa con qué CUIT / sector (San Justo Neumáticos S.R.L. o Centro
+   Integral de Neumáticos) se presenta a licitaciones.
+
+---
+
+### Estructura de la carpeta
+
+```text
+/radar-licitaciones
+    README.md          ← este archivo
+    /docs
+        decisiones.md            ← registro de decisiones
+        fuentes-y-adquisicion.md ← análisis de fuentes y método de lectura
+        blueprint-referencia.md  ← molde del sistema de busqueda-laboral
+    /data
+        fuentes_objetivo.csv     ← fuentes clasificadas por tipo de conector
+        planilla_*.csv           ← hojas exportadas de la Google Sheet de prospectos
+    /src               ← código (se crea al arrancar el MVP)
+```
+
+### Relación con otros proyectos
+
+- **`busqueda-clientes-potenciales`**: le da la lista de municipios objetivo. Este
+  proyecto no la reemplaza; se enfoca sólo en el canal licitación pública.
+- Ambos son del área **comercial** de la empresa, pero se mantienen separados: distinto
+  objetivo, distintos datos, distinto desarrollo.

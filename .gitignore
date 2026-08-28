@@ -1,0 +1,12 @@
+# temporales
+data/_probe/
+__pycache__/
+*.pyc
+~$*
+.DS_Store
+*.output
+
+# export crudo de la Google Sheet de prospectos: tiene datos de contacto de
+# empresas privadas y se puede volver a exportar cuando haga falta. No va al repo.
+data/planilla_*.csv
+data/sheet.html

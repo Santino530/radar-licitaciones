@@ -10,3 +10,6 @@ __pycache__/
 # empresas privadas y se puede volver a exportar cuando haga falta. No va al repo.
 data/planilla_*.csv
 data/sheet.html
+
+# dumps crudos opcionales del conector PBAC
+data/pbac_ReporteProcesos.xlsx

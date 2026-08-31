@@ -120,8 +120,13 @@ de apertura, estado y link al pliego.
   (`primera_vez_visto` = "nueva apertura").
 - **Automatización:** `.github/workflows/radar.yml` — corre `radar.py` 3 veces por día
   (09/13/18 hs ART) y commitea el CSV. **Se activa cuando el repo se suba a GitHub.**
-- **Falta:** conectores de boletines oficiales (Provincia/CABA/Nación), dashboard web +
-  notificación push, y subir el repo a GitHub.
+- **Panel:** `scripts/build_dashboard.py` arma `web/dashboard.html` desde los CSV. Se
+  publica como Artifact privado (link en `web/dashboard_url.txt`) para compartir con
+  quien tenga que verlo. Versión 1: sólo lectura (ver, filtrar, ordenar). Falta: que se
+  actualice solo con los datos nuevos de GitHub, y los botones de ✓/✗ para triar desde
+  la página.
+- **Falta:** conectores CABA / Nación / Boletín provincial, auto-actualización del panel
+  + notificación push, y subir el repo a GitHub.
 
 ## 10. Próximos pasos
 
@@ -162,6 +167,11 @@ de apertura, estado y link al pliego.
         radar.py       ← orquestador: corre todo y arma radar_sin_verificar.csv
         sibom_mvp.py    ← conector SIBOM
         pbac_mvp.py     ← conector PBAC
+    /scripts
+        build_dashboard.py  ← arma web/dashboard.html desde los CSV
+    /web
+        dashboard.html      ← el panel (se publica como Artifact)
+        dashboard_url.txt   ← el link del Artifact publicado
 ```
 
 ### Relación con otros proyectos

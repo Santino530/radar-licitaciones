@@ -160,6 +160,8 @@ de apertura, estado y link al pliego.
         decisiones.md
         fuentes-y-adquisicion.md
         inventario-fuentes-completo.md
+        portales-municipales.md       ← links de los portales de compras por municipio
+        grandes-flotas.md             ← entes estatales / empresas privadas con flota grande
         blueprint-referencia.md
     /data
         fuentes_objetivo.csv          ← fuentes clasificadas por tipo de conector

@@ -101,6 +101,9 @@ RUIDO_PATRONES = [
     "bateria solar", "banco de baterias", "bateria de reloj", "bateria de notebook",
     "bateria de tests", "bateria de pruebas", "bateria psicologica",
     "termotanque", "tanque acumulador",
+    "grupo electrogeno", "grupo generador", "para generador",   # baterias de generador
+    "transceptor", "transceptores", "equipos telefonicos",      # baterias de radio / handy
+    "intrinsecamente seguro",
 ]
 
 

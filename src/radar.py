@@ -90,6 +90,21 @@ def de_pbac(incluir_ruido):
 CONECTORES = {"sibom": de_sibom, "pbac": de_pbac}
 
 
+def reclasificar(row):
+    """Vuelve a pasar el filtro de ruido / estado sobre una fila ya guardada,
+    usando el texto que quedo en el CSV. Sirve para que, cuando mejoramos los
+    filtros, las mejoras alcancen tambien a lo que hoy no volvio a aparecer en
+    la fuente (si no, esa fila conserva la clasificacion vieja para siempre)."""
+    texto = f"{row.get('objeto', '')} {row.get('fragmento', '')}"
+    if row.get("fuente") == "sibom":
+        row["es_ruido"] = "si" if sibom_mvp.es_ruido(texto) else "no"
+        est = sibom_mvp.detectar_estado(texto)
+        if est:
+            row["estado"] = est
+    elif row.get("fuente") == "pbac":
+        row["es_ruido"] = "si" if pbac_mvp.es_ruido(texto) else "no"
+
+
 def cargar_previo():
     if not os.path.exists(CSV_RADAR):
         return {}
@@ -136,6 +151,8 @@ def main():
     # conservan si son de PBAC/apertura (para tener historial), marcando que no se vieron.
     solo_antes = [previo[k] for k in previo if k not in encontrados
                   and (not args.solo or previo[k]["fuente"] == args.solo)]
+    for row in solo_antes:
+        reclasificar(row)
 
     todas = nuevas + siguen + solo_antes
     todas.sort(key=lambda r: (r.get("primera_vez_visto", ""), r.get("fuente", "")),

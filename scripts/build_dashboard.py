@@ -213,20 +213,23 @@ def cargar_contactos():
 
 
 def buscar_contacto(comprador, fuente, contactos):
-    """Busca contacto por nombre de comprador; si no hay, cae al contacto general
-    de la fuente (PBAC / BAC)."""
+    """SIBOM: el 'comprador' ES el municipio -> se busca su oficina de compras.
+    PBAC / BAC: el 'comprador' es una unidad ejecutora (hospital, ministerio...) ->
+    se usa el contacto general del portal, NO se intenta adivinar por el nombre."""
     if not contactos:
         return None
+    if fuente in ("pbac", "bac"):
+        return contactos.get(fuente)
     k = _clave_comprador(comprador)
     if k in contactos:
         return contactos[k]
-    # match parcial: el comprador contiene (o esta contenido en) una clave cargada
+    # match parcial solo para SIBOM (nombre de municipio con/sin acento, "de", etc.)
     for ck, cv in contactos.items():
+        if ck in ("pbac", "bac"):
+            continue
         if ck and (ck in k or k in ck) and len(ck) > 4:
             return cv
-    if fuente and fuente.upper() in contactos:
-        return contactos[fuente.upper()]
-    return contactos.get(_clave_comprador(fuente))
+    return None
 
 
 def construir_meta(filas):

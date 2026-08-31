@@ -56,7 +56,8 @@ KEYWORDS = [
     "recapado",
     "recauchutaje",
     "gomeria",
-    "camaras y llantas",
+    "llanta",
+    "llantas",
     "camara de aire",           # camaras de neumatico (evita "camara" a secas = video/frio/septica)
     "protector de neumaticos",  # faja de proteccion entre camara y cubierta
     "bateria",                  # baterias de auto / camion
@@ -128,20 +129,23 @@ def es_ruido(texto):
 # o similar, ya no es una oportunidad para presentarse (sirve como inteligencia
 # de competencia). Si no se detecta nada, se deja vacio (no se asume "abierta").
 ADJUDICADA_PATRONES = [
-    "adjudicacion", "adjudicación", "adjudicado", "adjudicada", "se adjudica",
-    "preadjudic", "pre-adjudic", "pre adjudic",
+    "adjudicacion", "adjudicado", "adjudicada", "se adjudica", "adjudiquese",
+    "adjudicatario", "preadjudic", "pre-adjudic", "pre adjudic",
+    # lenguaje de acto de adjudicacion que nombra al ganador sin decir "adjudica"
+    "mejor oferta, proveedor", "mejor oferta el proveedor",
+    "mejor oferta al proveedor", "oferta mas conveniente el proveedor",
 ]
 DESIERTA_PATRONES = [
     "desierta", "fracasada", "fracaso", "sin ofertas", "deja sin efecto",
-    "se anula", "anulacion", "anulación",
+    "se anula", "anulacion",
 ]
 
 
 def detectar_estado(texto):
-    t = texto.lower()
-    if any(p in t for p in DESIERTA_PATRONES):
+    t = _norm(texto)
+    if any(_norm(p) in t for p in DESIERTA_PATRONES):
         return "cerrada"
-    if any(p in t for p in ADJUDICADA_PATRONES):
+    if any(_norm(p) in t for p in ADJUDICADA_PATRONES):
         return "adjudicada"
     return ""
 

@@ -137,9 +137,10 @@ de apertura, estado y link al pliego.
 1. Subir el repo a un GitHub privado y probar el workflow con "Run workflow" a mano.
 2. Que el panel se actualice solo: una rutina en la nube que hace `git pull`, corre
    `build_dashboard.py` y republica el Artifact con la misma URL.
-3. Conector `comprar` (Nación, COMPR.AR) — tiene API/OCDS real.
-4. Portales municipales de los partidos del AMBA que no publican en SIBOM; Boletín
+3. Portales municipales de los partidos del AMBA que no publican en SIBOM; Boletín
    Oficial PBA como respaldo legal.
+4. Retomar `comprar` (Nación): postergado el 2026-08-31 — el portal resiste el
+   postback y los datos abiertos se actualizan cada 6 meses (ver `docs/decisiones.md`).
 5. Botones ✓/✗ en el panel para triar desde la página (capacidad `artifact`).
 6. Afinar filtros de ruido y palabras clave con lo que vaya juntando el radar.
 7. Confirmar con la empresa con qué CUIT / sector (San Justo Neumáticos S.R.L. o Centro

@@ -70,12 +70,38 @@ RUIDO_PATRONES = [
     "cambio de razon social", "cambio razon social", "rubro gomeria",  # habilitaciones
     "ordenanza fiscal", "ordenanza impositiva", "impositiva",           # ordenanzas tributarias
     "convalida", "justifica gasto", "reparacion de chapa",             # rendiciones de gastos
+    "playon deportivo", "playón deportivo", "cubierta de playon",       # "cubierta" = techo, no neumatico
+    "cubierta del playon", "cubierta metalica", "cubierta metálica",
+    "cubierta de chapa", "cubierta del natatorio", "cubierta del polideportivo",
 ]
 
 
 def es_ruido(texto):
     t = texto.lower()
     return any(p in t for p in RUIDO_PATRONES)
+
+
+# --- Estado del llamado -----------------------------------------------------
+# SIBOM no publica un campo "estado". Se infiere del texto: si dice adjudicacion
+# o similar, ya no es una oportunidad para presentarse (sirve como inteligencia
+# de competencia). Si no se detecta nada, se deja vacio (no se asume "abierta").
+ADJUDICADA_PATRONES = [
+    "adjudicacion", "adjudicación", "adjudicado", "adjudicada", "se adjudica",
+    "preadjudic", "pre-adjudic", "pre adjudic",
+]
+DESIERTA_PATRONES = [
+    "desierta", "fracasada", "fracaso", "sin ofertas", "deja sin efecto",
+    "se anula", "anulacion", "anulación",
+]
+
+
+def detectar_estado(texto):
+    t = texto.lower()
+    if any(p in t for p in DESIERTA_PATRONES):
+        return "cerrada"
+    if any(p in t for p in ADJUDICADA_PATRONES):
+        return "adjudicada"
+    return ""
 
 
 # --- Municipios de la zona objetivo (AMBA + Gran La Plata) -------------------
@@ -248,9 +274,10 @@ def recolectar(desde=None, max_pages=8, solo_zona=True, incluir_ruido=True,
 
     rows = list(by_url.values())
     for r in rows:
-        r["municipio"] = r["municipio"]
+        texto = r["titulo"] + " " + r["tags"] + " " + r["fragmento"]
         r["categoria_zona"] = clasificar_zona(r["municipio"])
-        r["es_ruido"] = es_ruido(r["titulo"] + " " + r["tags"] + " " + r["fragmento"])
+        r["es_ruido"] = es_ruido(texto)
+        r["estado"] = detectar_estado(texto)
 
     if solo_zona:
         rows = [r for r in rows if r["categoria_zona"] in ("objetivo", "volumen_alto")]
@@ -304,10 +331,12 @@ def main():
     rows = list(by_url.values())
     print(f"3) {len(rows)} resultados unicos (deduplicados por URL)")
 
-    # Clasificar cada fila: grupo de zona y si es ruido
+    # Clasificar cada fila: grupo de zona, si es ruido y estado inferido
     for r in rows:
+        texto = r["titulo"] + " " + r["tags"] + " " + r["fragmento"]
         r["categoria_zona"] = clasificar_zona(r["municipio"])
-        r["es_ruido"] = es_ruido(r["titulo"] + " " + r["tags"] + " " + r["fragmento"])
+        r["es_ruido"] = es_ruido(texto)
+        r["estado"] = detectar_estado(texto)
 
     # Filtro por municipio
     if args.todos:
@@ -340,12 +369,13 @@ def main():
     out_path = os.path.join(DATA, "mvp_sibom_resultados.csv")
     with open(out_path, "w", newline="", encoding="utf-8") as f:
         w = csv.writer(f)
-        w.writerow(["municipio", "categoria_zona", "es_ruido", "fecha_publicacion",
-                    "titulo", "url", "tags", "keywords_match", "fragmento"])
+        w.writerow(["municipio", "categoria_zona", "es_ruido", "estado",
+                    "fecha_publicacion", "titulo", "url", "tags", "keywords_match",
+                    "fragmento"])
         for r in rows:
             w.writerow([r["municipio"], r["categoria_zona"],
-                        "si" if r["es_ruido"] else "no", r["fecha_publicacion"],
-                        r["titulo"], r["url"], r["tags"],
+                        "si" if r["es_ruido"] else "no", r.get("estado", ""),
+                        r["fecha_publicacion"], r["titulo"], r["url"], r["tags"],
                         ",".join(sorted(r["keywords"])), r["fragmento"]])
     print(f"4) Escrito {out_path}  ({len(rows)} filas)")
 

@@ -124,11 +124,17 @@ de apertura, estado y link al pliego.
 ## 10. Próximos pasos
 
 1. Subir el repo a un GitHub privado y probar el workflow con "Run workflow" a mano.
-2. Conector de boletines oficiales: Boletín Oficial PBA, Boletín Oficial CABA, BORA
-   (Nación) + datos abiertos OCDS de CABA.
-3. Afinar filtros de ruido y palabras clave con lo que vaya juntando el radar.
-4. Dashboard web (Artifact) + `PushNotification`, reusando el molde de `busqueda-laboral`.
-5. Confirmar con la empresa con qué CUIT / sector (San Justo Neumáticos S.R.L. o Centro
+2. Conector `bac` (CABA): el listado de procesos y aperturas de
+   `buenosairescompras.gob.ar` es público sin cuenta; se modela sobre `pbac_mvp.py`
+   (misma familia de software). Los datos abiertos OCDS de CABA se actualizan sólo
+   **trimestralmente** → no sirven para el radar diario, sólo para análisis histórico.
+3. Portales municipales de los partidos del AMBA que no publican en SIBOM.
+4. Conector `comprar` (Nación) y, como respaldo legal, el Boletín Oficial PBA.
+5. Afinar filtros de ruido y palabras clave con lo que vaya juntando el radar
+   (hecho una primera vez el 2026-08-31: ruido "playón deportivo", estado inferido
+   `adjudicada` / `cerrada`).
+6. Dashboard web (Artifact) + `PushNotification`, reusando el molde de `busqueda-laboral`.
+7. Confirmar con la empresa con qué CUIT / sector (San Justo Neumáticos S.R.L. o Centro
    Integral de Neumáticos) se presenta a licitaciones.
 
 ---

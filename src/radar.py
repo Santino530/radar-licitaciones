@@ -59,7 +59,7 @@ def de_sibom(incluir_ruido, dias=90):
             "tipo": "",
             "fecha_publicacion": r["fecha_publicacion"],
             "fecha_apertura": "",
-            "estado": "",
+            "estado": r.get("estado", ""),
             "categoria_zona": r["categoria_zona"],
             "es_ruido": "si" if r["es_ruido"] else "no",
             "keywords": ",".join(sorted(r["keywords"])),
@@ -156,6 +156,8 @@ def main():
         print("\n  --- NUEVAS APERTURAS ---")
         for r in nuevas:
             marca = " [ruido]" if r["es_ruido"] == "si" else ""
+            if r.get("estado"):
+                marca += f" [{r['estado']}]"
             fecha = r["fecha_apertura"] or r["fecha_publicacion"]
             print(f"  [{r['fuente']}] {fecha}  {r['comprador'][:35]}")
             print(f"         {r['objeto'][:80]}{marca}")

@@ -126,9 +126,11 @@ de apertura, estado y link al pliego.
   (09/13/18 hs ART) y commitea el CSV. **Se activa cuando el repo se suba a GitHub.**
 - **Panel:** `scripts/build_dashboard.py` arma `web/dashboard.html` desde los CSV. Se
   publica como Artifact privado (link en `web/dashboard_url.txt`) para compartir con
-  quien tenga que verlo. Versión 1: sólo lectura (ver, filtrar, ordenar). Falta: que se
-  actualice solo con los datos nuevos de GitHub, y los botones de ✓/✗ para triar desde
-  la página.
+  quien tenga que verlo. Tocando el nombre del comprador se despliega el detalle
+  completo del pliego + el contacto de compras (de `data/contactos_compras.csv`, tabla
+  manual que el equipo va completando; si no hay, ofrece un botón "buscar contacto").
+  Tiene tema claro/oscuro, filtro por producto y marca de "nueva" (≤7 días). Falta: que
+  se actualice solo con los datos de GitHub, y los botones de ✓/✗ para triar.
 - **Falta:** conectores Nación / Boletín provincial / portales municipales,
   auto-actualización del panel + notificación push, y subir el repo a GitHub.
 
@@ -162,6 +164,7 @@ de apertura, estado y link al pliego.
     /data
         fuentes_objetivo.csv          ← fuentes clasificadas por tipo de conector
         proveedores_conocidos.csv     ← proveedores/competidores que ya venden al Estado
+        contactos_compras.csv         ← comprador → mail/tel de la oficina de compras (manual)
         sibom_city_ids.csv            ← municipio → id en SIBOM
         radar_sin_verificar.csv       ← salida del motor (lo que hay que verificar)
         planilla_*.csv                ← export de la Google Sheet (ignorado por git)

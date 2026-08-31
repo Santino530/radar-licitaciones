@@ -170,11 +170,22 @@
   .card--soon::before { background: var(--soon); }
   .card--noise::before { background: var(--noise); }
 
-  .card__top { display: flex; flex-wrap: wrap; gap: 8px; align-items: baseline; justify-content: space-between; }
+  .card__head {
+    appearance: none; width: 100%; background: none; border: 0; padding: 0;
+    margin: 0; cursor: pointer; color: inherit; font: inherit; text-align: left;
+    display: flex; flex-wrap: wrap; gap: 8px; align-items: baseline;
+  }
+  .card__head:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
   .card__buyer {
     font-family: "Libre Franklin", sans-serif; font-weight: 600; font-size: 1rem;
-    margin: 0; color: var(--ink);
+    margin: 0; color: var(--ink); flex: 1 1 auto;
   }
+  .card__pills { display: inline-flex; gap: 6px; align-items: baseline; flex: 0 0 auto; }
+  .card__chevron {
+    flex: 0 0 auto; color: var(--ink-soft); font-size: 12px; transition: transform 120ms ease;
+    align-self: center;
+  }
+  .card--expanded .card__chevron { transform: rotate(90deg); }
   .pill {
     font-family: "IBM Plex Mono", monospace; font-size: 10.5px; font-weight: 500;
     letter-spacing: .04em; text-transform: uppercase;
@@ -192,6 +203,44 @@
   .card--flag::after {
     content: ""; position: absolute; inset: 0; border-radius: 10px;
     box-shadow: inset 0 0 0 1px var(--accent); pointer-events: none;
+  }
+
+  .card__detail {
+    margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line);
+  }
+  .detail {
+    display: grid; grid-template-columns: max-content 1fr; gap: 7px 16px;
+    font-size: 13px; margin-bottom: 12px;
+  }
+  .detail__k {
+    font-family: "IBM Plex Mono", monospace; font-size: 10.5px; letter-spacing: .04em;
+    text-transform: uppercase; color: var(--ink-soft); padding-top: 2px;
+  }
+  .detail__v { color: var(--ink); white-space: pre-wrap; word-break: break-word; }
+  .detail__v a { color: var(--accent); }
+  .contacto {
+    background: var(--surface-2); border: 1px solid var(--line); border-radius: 8px;
+    padding: 11px 13px; font-size: 13px;
+  }
+  .contacto__t {
+    font-family: "Libre Franklin", sans-serif; font-weight: 700; font-size: 12px;
+    text-transform: uppercase; letter-spacing: .03em; color: var(--ink-soft); margin: 0 0 7px;
+  }
+  .contacto__row { display: flex; flex-wrap: wrap; gap: 3px 8px; margin: 3px 0; align-items: baseline; }
+  .contacto__row b {
+    font-family: "IBM Plex Mono", monospace; font-size: 10.5px; text-transform: uppercase;
+    color: var(--ink-soft); font-weight: 500; flex: 0 0 62px;
+  }
+  .contacto a { color: var(--accent); word-break: break-all; }
+  .btn-buscar {
+    appearance: none; display: inline-block; margin-top: 4px;
+    background: var(--accent); color: var(--surface); text-decoration: none;
+    font-size: 12px; font-weight: 500; padding: 6px 11px; border-radius: 7px;
+  }
+  .detail__note { font-size: 11.5px; color: var(--ink-soft); margin: 10px 0 0; }
+  @media (max-width: 560px) {
+    .detail { grid-template-columns: 1fr; gap: 2px 0; }
+    .detail__k { padding-top: 8px; }
   }
 
   .card__object { margin: 8px 0 0; color: var(--ink); }
@@ -320,6 +369,7 @@
   <details class="legend">
     <summary>Cómo leer este panel</summary>
     <div class="legend__body">
+      <span><b>Tocá el nombre del comprador</b> en cualquier tarjeta para desplegar el detalle completo del pliego y el contacto.</span>
       <span><span class="legend__dot" style="background:var(--accent)"></span><b>Nueva</b> — el motor la detectó en los últimos 7 días. Es lo que hay que mirar primero.</span>
       <span><span class="legend__dot" style="background:var(--open)"></span><b>Abierta</b> — llamado vigente, se puede presentar oferta.</span>
       <span><span class="legend__dot" style="background:var(--soon)"></span><b>Por vencer</b> — la apertura de sobres es en 21 días o menos.</span>
@@ -345,9 +395,9 @@
   </footer>
 </div>
 
-<script id="radar-data" type="application/json">[{"fuente": "sibom", "comprador": "Berazategui", "texto": "Licitacion Privada 31/2026 para el objeto \"Adquisicion de baterias para flota rodante municipal\" ...", "ref": "Decreto Nº555 en el boletín 157º de Berazategui", "estado": "", "grupo": "abierta", "zona": "objetivo", "keywords": ["bateria", "baterias"], "productos": ["Baterías"], "nueva": true, "url": "https://sibom.slyt.gba.gob.ar/bulletins/15450/contents/2422693", "fecha_pub_iso": "2026-07-29", "fecha_pub_label": "29/07/2026", "fecha_ap_iso": "", "fecha_ap_label": "", "dias_apertura": null, "detectada": "2026-08-31", "corrida": "2026-08-31"}, {"fuente": "sibom", "comprador": "Tandil", "texto": "de la compra de llantas y cubiertas del tractor Massey Ferguson 265 que se utiliza para tareas de mantenimiento dentro ... […] La solicitud realizada por el Ente Administrador del Parque Industrial […] a lo dispuesto por la Ordenanza N°12.646 y poder cubrir los gastos de la compra de llantas y cubiertas del tractor Massey Ferguson 265 que se utiliza para tareas ...", "ref": "Decreto Nº2070/2026 en el boletín 345º de Tandil", "estado": "", "grupo": "abierta", "zona": "volumen_alto", "keywords": ["llanta", "llantas"], "productos": ["Llantas"], "nueva": true, "url": "https://sibom.slyt.gba.gob.ar/bulletins/15286/contents/2410659", "fecha_pub_iso": "2026-07-01", "fecha_pub_label": "01/07/2026", "fecha_ap_iso": "", "fecha_ap_label": "", "dias_apertura": null, "detectada": "2026-08-28", "corrida": "2026-08-31"}, {"fuente": "sibom", "comprador": "Mercedes", "texto": "es la adquisición de cubiertas ... […] - -MERCEDES-COMP#SEH, caratulado “Concurso de Precios N° 33/2026 – Adquisición de cubiertas ”, y; ... […] .000,00 (Pesos veinticuatro millones ochocientos noventa mil con 00/100 centavos) la compra de cubiertas , según lo especificado en el Pliego de Bases y Condiciones obrante en el EX-2026-00047451- -MERCEDES-COMP#SEH ...", "ref": "Decreto Nº1038/2026 en el boletín 107º de Mercedes", "estado": "adjudicada", "grupo": "cerrada", "zona": "volumen_alto", "keywords": ["cubierta", "cubiertas"], "productos": ["Neumáticos"], "nueva": true, "url": "https://sibom.slyt.gba.gob.ar/bulletins/15416/contents/2422544", "fecha_pub_iso": "2026-07-30", "fecha_pub_label": "30/07/2026", "fecha_ap_iso": "", "fecha_ap_label": "", "dias_apertura": null, "detectada": "2026-08-28", "corrida": "2026-08-31"}, {"fuente": "sibom", "comprador": "Tandil", "texto": ", y el ítem N°2 a la mejor oferta, Proveedor LARROCA NEUMATICOS S […] ) Proveedor LAROCCA NEUMATICOS S.A.: Ítem N° 2 por un valor de $3.769.740,00 (tres millones setecientos […] El Concurso de Precios N° 64-03-26 “ADQUISICION NEUMATICOS PARA CARGA Y TRANSPORTE", "ref": "Decreto Nº2364/2026 en el boletín 349º de Tandil", "estado": "adjudicada", "grupo": "cerrada", "zona": "volumen_alto", "keywords": ["neumatico", "neumaticos"], "productos": ["Neumáticos"], "nueva": true, "url": "https://sibom.slyt.gba.gob.ar/bulletins/15468/contents/2423123", "fecha_pub_iso": "2026-07-29", "fecha_pub_label": "29/07/2026", "fecha_ap_iso": "", "fecha_ap_label": "", "dias_apertura": null, "detectada": "2026-08-28", "corrida": "2026-08-31"}, {"fuente": "sibom", "comprador": "Nueve de Julio", "texto": "Que corresponde dictar acto administrativo expreso, de conformidad a las constancias enunciadas ... […] La comunicación NO–2026-00012016-MUNINUE-SSC#SAH. El expediente Nº 4082-262/26. La solicitud de la Secretaría de Obras y Servicios Públicos y la Secretaria de Gobierno. Las invitaciones a cotizar y los presupuestos ... […] LLAMADO A LICITACION Nº 13 - NEUMATICOS - ADJUDICACIÓN. ...", "ref": "Decreto Nº689/2026 en el boletín 121º de Nueve de Julio", "estado": "adjudicada", "grupo": "cerrada", "zona": "volumen_alto", "keywords": ["neumatico", "neumaticos"], "productos": ["Neumáticos"], "nueva": true, "url": "https://sibom.slyt.gba.gob.ar/bulletins/14909/contents/2392207", "fecha_pub_iso": "2026-06-02", "fecha_pub_label": "02/06/2026", "fecha_ap_iso": "", "fecha_ap_label": "", "dias_apertura": null, "detectada": "2026-08-28", "corrida": "2026-08-31"}, {"fuente": "sibom", "comprador": "Bahia Blanca", "texto": ", y; CONSIDERANDO: Que la presente contratación consiste en el alquiler de equipos telefónicos para el Proceso Apell, el cual incluye 20 equipos transceptores comunes, reposición de baterías ... […] no antiexplosivos, 5 equipos transceptores portátiles intrínsecamente seguros con reposición de baterías , 9 transceptores portátiles, reposición de baterías , 2 equipos base completo y el mantenimiento bases ... […] a la firma BAHIA COMUNICACIONES S.A. - Proveedor Nº 5.375, el alquiler de 5 (CINCO) Equipos Transceptores portátiles, intrinsecameante seguros con reposición de baterias , 20 (VEINTE)", "ref": "Decreto Nº1163 en el boletín 499º de Bahia Blanca", "estado": "", "grupo": "ruido", "zona": "volumen_alto", "keywords": ["bateria", "baterias"], "productos": ["Baterías"], "nueva": true, "url": "https://sibom.slyt.gba.gob.ar/bulletins/15325/contents/2412681", "fecha_pub_iso": "2026-07-08", "fecha_pub_label": "08/07/2026", "fecha_ap_iso": "", "fecha_ap_label": "", "dias_apertura": null, "detectada": "2026-08-31", "corrida": "2026-08-31"}, {"fuente": "sibom", "comprador": "Bahia Blanca", "texto": "reguladora, batería y antena omnidireccional, y 5 equipos transceptores portátiles, intrínsecamente seguros con reposición de baterías ; Que a fojas 7, el Comité Técnico Ejecutivo, fundamenta ... […] - Transceptores Portátiles Sistema de Trunking, incluye 1 (uno) Equipo Base Completo con Fuente Reguladora, Batería y Antena Omnidireccional y 5 (cinco) Equipos Transceptores Portátiles intrínsecamente seguros ... […] , con reposición de baterías , por el período comprendido entre el 1 de julio y el 31 de diciembre de 2026, por un total de $22.960.782; Por todo lo expuesto, el INTENDENTE MUNICIPAL", "ref": "Decreto Nº1415 en el boletín 499º de Bahia Blanca", "estado": "", "grupo": "ruido", "zona": "volumen_alto", "keywords": ["bateria", "baterias"], "productos": ["Baterías"], "nueva": true, "url": "https://sibom.slyt.gba.gob.ar/bulletins/15325/contents/2412285", "fecha_pub_iso": "2026-07-08", "fecha_pub_label": "08/07/2026", "fecha_ap_iso": "", "fecha_ap_label": "", "dias_apertura": null, "detectada": "2026-08-31", "corrida": "2026-08-31"}, {"fuente": "sibom", "comprador": "General San Martín", "texto": "Ampliando monto de obra Cubierta playón deportivo del Parque José Hernández y ampliando plazo de obra. ...", "ref": "Decreto Nº00097/26 en el boletín 2040º de General San Martín", "estado": "", "grupo": "ruido", "zona": "objetivo", "keywords": ["cubierta", "cubiertas"], "productos": ["Neumáticos"], "nueva": true, "url": "https://sibom.slyt.gba.gob.ar/bulletins/15141/contents/2400537", "fecha_pub_iso": "2026-06-04", "fecha_pub_label": "04/06/2026", "fecha_ap_iso": "", "fecha_ap_label": "", "dias_apertura": null, "detectada": "2026-08-28", "corrida": "2026-08-28"}, {"fuente": "pbac", "comprador": "103.13.4.1 - Dir. Pcial. Hospitales - Hospital M.V.De Martinez - Tigre", "texto": "BATERIAS PARA GRUPO ELECTROGENO", "ref": "Proceso 2026-50-101-293", "estado": "publicado", "grupo": "ruido", "zona": "", "keywords": ["bateria"], "productos": ["Baterías"], "nueva": true, "url": "https://pbac.cgp.gba.gov.ar/ListarAperturaProxima.aspx", "fecha_pub_iso": "", "fecha_pub_label": "", "fecha_ap_iso": "2026-09-04", "fecha_ap_label": "04/09/2026 10:00", "dias_apertura": 4, "detectada": "2026-08-31", "corrida": "2026-08-31"}]</script>
+<script id="radar-data" type="application/json">[{"fuente": "sibom", "comprador": "Berazategui", "objeto": "Decreto Nº555 en el boletín 157º de Berazategui", "fragmento": "Licitacion Privada 31/2026 para el objeto \"Adquisicion de baterias para flota rodante municipal\" ...", "texto": "Licitacion Privada 31/2026 para el objeto \"Adquisicion de baterias para flota rodante municipal\" ...", "ref": "Decreto Nº555 en el boletín 157º de Berazategui", "tipo": "", "id_origen": "https://sibom.slyt.gba.gob.ar/bulletins/15450/contents/2422693", "estado": "", "grupo": "abierta", "zona": "objetivo", "keywords": ["bateria", "baterias"], "productos": ["Baterías"], "nueva": true, "url": "https://sibom.slyt.gba.gob.ar/bulletins/15450/contents/2422693", "fecha_pub_iso": "2026-07-29", "fecha_pub_label": "29/07/2026", "fecha_ap_iso": "", "fecha_ap_label": "", "dias_apertura": null, "detectada": "2026-08-31", "corrida": "2026-08-31", "contacto": null}, {"fuente": "sibom", "comprador": "Tandil", "objeto": "Decreto Nº2070/2026 en el boletín 345º de Tandil", "fragmento": "de la compra de llantas y cubiertas del tractor Massey Ferguson 265 que se utiliza para tareas de mantenimiento dentro ... […] La solicitud realizada por el Ente Administrador del Parque Industrial […] a lo dispuesto por la Ordenanza N°12.646 y poder cubrir los gastos de la compra de llantas y cubiertas del tractor Massey Ferguson 265 que se utiliza para tareas ...", "texto": "de la compra de llantas y cubiertas del tractor Massey Ferguson 265 que se utiliza para tareas de mantenimiento dentro ... […] La solicitud realizada por el Ente Administrador del Parque Industrial […] a lo dispuesto por la Ordenanza N°12.646 y poder cubrir los gastos de la compra de llantas y cubiertas del tractor Massey Ferguson 265 que se utiliza para tareas ...", "ref": "Decreto Nº2070/2026 en el boletín 345º de Tandil", "tipo": "", "id_origen": "https://sibom.slyt.gba.gob.ar/bulletins/15286/contents/2410659", "estado": "", "grupo": "abierta", "zona": "volumen_alto", "keywords": ["llanta", "llantas"], "productos": ["Llantas"], "nueva": true, "url": "https://sibom.slyt.gba.gob.ar/bulletins/15286/contents/2410659", "fecha_pub_iso": "2026-07-01", "fecha_pub_label": "01/07/2026", "fecha_ap_iso": "", "fecha_ap_label": "", "dias_apertura": null, "detectada": "2026-08-28", "corrida": "2026-08-31", "contacto": null}, {"fuente": "sibom", "comprador": "Mercedes", "objeto": "Decreto Nº1038/2026 en el boletín 107º de Mercedes", "fragmento": "es la adquisición de cubiertas ... […] - -MERCEDES-COMP#SEH, caratulado “Concurso de Precios N° 33/2026 – Adquisición de cubiertas ”, y; ... […] .000,00 (Pesos veinticuatro millones ochocientos noventa mil con 00/100 centavos) la compra de cubiertas , según lo especificado en el Pliego de Bases y Condiciones obrante en el EX-2026-00047451- -MERCEDES-COMP#SEH ...", "texto": "es la adquisición de cubiertas ... […] - -MERCEDES-COMP#SEH, caratulado “Concurso de Precios N° 33/2026 – Adquisición de cubiertas ”, y; ... […] .000,00 (Pesos veinticuatro millones ochocientos noventa mil con 00/100 centavos) la compra de cubiertas , según lo especificado en el Pliego de Bases y Condiciones obrante en el EX-2026-00047451- -MERCEDES-COMP#SEH ...", "ref": "Decreto Nº1038/2026 en el boletín 107º de Mercedes", "tipo": "", "id_origen": "https://sibom.slyt.gba.gob.ar/bulletins/15416/contents/2422544", "estado": "adjudicada", "grupo": "cerrada", "zona": "volumen_alto", "keywords": ["cubierta", "cubiertas"], "productos": ["Neumáticos"], "nueva": true, "url": "https://sibom.slyt.gba.gob.ar/bulletins/15416/contents/2422544", "fecha_pub_iso": "2026-07-30", "fecha_pub_label": "30/07/2026", "fecha_ap_iso": "", "fecha_ap_label": "", "dias_apertura": null, "detectada": "2026-08-28", "corrida": "2026-08-31", "contacto": null}, {"fuente": "sibom", "comprador": "Tandil", "objeto": "Decreto Nº2364/2026 en el boletín 349º de Tandil", "fragmento": ", y el ítem N°2 a la mejor oferta, Proveedor LARROCA NEUMATICOS S […] ) Proveedor LAROCCA NEUMATICOS S.A.: Ítem N° 2 por un valor de $3.769.740,00 (tres millones setecientos […] El Concurso de Precios N° 64-03-26 “ADQUISICION NEUMATICOS PARA CARGA Y TRANSPORTE", "texto": ", y el ítem N°2 a la mejor oferta, Proveedor LARROCA NEUMATICOS S […] ) Proveedor LAROCCA NEUMATICOS S.A.: Ítem N° 2 por un valor de $3.769.740,00 (tres millones setecientos […] El Concurso de Precios N° 64-03-26 “ADQUISICION NEUMATICOS PARA CARGA Y TRANSPORTE", "ref": "Decreto Nº2364/2026 en el boletín 349º de Tandil", "tipo": "", "id_origen": "https://sibom.slyt.gba.gob.ar/bulletins/15468/contents/2423123", "estado": "adjudicada", "grupo": "cerrada", "zona": "volumen_alto", "keywords": ["neumatico", "neumaticos"], "productos": ["Neumáticos"], "nueva": true, "url": "https://sibom.slyt.gba.gob.ar/bulletins/15468/contents/2423123", "fecha_pub_iso": "2026-07-29", "fecha_pub_label": "29/07/2026", "fecha_ap_iso": "", "fecha_ap_label": "", "dias_apertura": null, "detectada": "2026-08-28", "corrida": "2026-08-31", "contacto": null}, {"fuente": "sibom", "comprador": "Nueve de Julio", "objeto": "Decreto Nº689/2026 en el boletín 121º de Nueve de Julio", "fragmento": "Que corresponde dictar acto administrativo expreso, de conformidad a las constancias enunciadas ... […] La comunicación NO–2026-00012016-MUNINUE-SSC#SAH. El expediente Nº 4082-262/26. La solicitud de la Secretaría de Obras y Servicios Públicos y la Secretaria de Gobierno. Las invitaciones a cotizar y los presupuestos ... […] LLAMADO A LICITACION Nº 13 - NEUMATICOS - ADJUDICACIÓN. ...", "texto": "Que corresponde dictar acto administrativo expreso, de conformidad a las constancias enunciadas ... […] La comunicación NO–2026-00012016-MUNINUE-SSC#SAH. El expediente Nº 4082-262/26. La solicitud de la Secretaría de Obras y Servicios Públicos y la Secretaria de Gobierno. Las invitaciones a cotizar y los presupuestos ... […] LLAMADO A LICITACION Nº 13 - NEUMATICOS - ADJUDICACIÓN. ...", "ref": "Decreto Nº689/2026 en el boletín 121º de Nueve de Julio", "tipo": "", "id_origen": "https://sibom.slyt.gba.gob.ar/bulletins/14909/contents/2392207", "estado": "adjudicada", "grupo": "cerrada", "zona": "volumen_alto", "keywords": ["neumatico", "neumaticos"], "productos": ["Neumáticos"], "nueva": true, "url": "https://sibom.slyt.gba.gob.ar/bulletins/14909/contents/2392207", "fecha_pub_iso": "2026-06-02", "fecha_pub_label": "02/06/2026", "fecha_ap_iso": "", "fecha_ap_label": "", "dias_apertura": null, "detectada": "2026-08-28", "corrida": "2026-08-31", "contacto": null}, {"fuente": "sibom", "comprador": "Bahia Blanca", "objeto": "Decreto Nº1163 en el boletín 499º de Bahia Blanca", "fragmento": ", y; CONSIDERANDO: Que la presente contratación consiste en el alquiler de equipos telefónicos para el Proceso Apell, el cual incluye 20 equipos transceptores comunes, reposición de baterías ... […] no antiexplosivos, 5 equipos transceptores portátiles intrínsecamente seguros con reposición de baterías , 9 transceptores portátiles, reposición de baterías , 2 equipos base completo y el mantenimiento bases ... […] a la firma BAHIA COMUNICACIONES S.A. - Proveedor Nº 5.375, el alquiler de 5 (CINCO) Equipos Transceptores portátiles, intrinsecameante seguros con reposición de baterias , 20 (VEINTE)", "texto": ", y; CONSIDERANDO: Que la presente contratación consiste en el alquiler de equipos telefónicos para el Proceso Apell, el cual incluye 20 equipos transceptores comunes, reposición de baterías ... […] no antiexplosivos, 5 equipos transceptores portátiles intrínsecamente seguros con reposición de baterías , 9 transceptores portátiles, reposición de baterías , 2 equipos base completo y el mantenimiento bases ... […] a la firma BAHIA COMUNICACIONES S.A. - Proveedor Nº 5.375, el alquiler de 5 (CINCO) Equipos Transceptores portátiles, intrinsecameante seguros con reposición de baterias , 20 (VEINTE)", "ref": "Decreto Nº1163 en el boletín 499º de Bahia Blanca", "tipo": "", "id_origen": "https://sibom.slyt.gba.gob.ar/bulletins/15325/contents/2412681", "estado": "", "grupo": "ruido", "zona": "volumen_alto", "keywords": ["bateria", "baterias"], "productos": ["Baterías"], "nueva": true, "url": "https://sibom.slyt.gba.gob.ar/bulletins/15325/contents/2412681", "fecha_pub_iso": "2026-07-08", "fecha_pub_label": "08/07/2026", "fecha_ap_iso": "", "fecha_ap_label": "", "dias_apertura": null, "detectada": "2026-08-31", "corrida": "2026-08-31", "contacto": null}, {"fuente": "sibom", "comprador": "Bahia Blanca", "objeto": "Decreto Nº1415 en el boletín 499º de Bahia Blanca", "fragmento": "reguladora, batería y antena omnidireccional, y 5 equipos transceptores portátiles, intrínsecamente seguros con reposición de baterías ; Que a fojas 7, el Comité Técnico Ejecutivo, fundamenta ... […] - Transceptores Portátiles Sistema de Trunking, incluye 1 (uno) Equipo Base Completo con Fuente Reguladora, Batería y Antena Omnidireccional y 5 (cinco) Equipos Transceptores Portátiles intrínsecamente seguros ... […] , con reposición de baterías , por el período comprendido entre el 1 de julio y el 31 de diciembre de 2026, por un total de $22.960.782; Por todo lo expuesto, el INTENDENTE MUNICIPAL", "texto": "reguladora, batería y antena omnidireccional, y 5 equipos transceptores portátiles, intrínsecamente seguros con reposición de baterías ; Que a fojas 7, el Comité Técnico Ejecutivo, fundamenta ... […] - Transceptores Portátiles Sistema de Trunking, incluye 1 (uno) Equipo Base Completo con Fuente Reguladora, Batería y Antena Omnidireccional y 5 (cinco) Equipos Transceptores Portátiles intrínsecamente seguros ... […] , con reposición de baterías , por el período comprendido entre el 1 de julio y el 31 de diciembre de 2026, por un total de $22.960.782; Por todo lo expuesto, el INTENDENTE MUNICIPAL", "ref": "Decreto Nº1415 en el boletín 499º de Bahia Blanca", "tipo": "", "id_origen": "https://sibom.slyt.gba.gob.ar/bulletins/15325/contents/2412285", "estado": "", "grupo": "ruido", "zona": "volumen_alto", "keywords": ["bateria", "baterias"], "productos": ["Baterías"], "nueva": true, "url": "https://sibom.slyt.gba.gob.ar/bulletins/15325/contents/2412285", "fecha_pub_iso": "2026-07-08", "fecha_pub_label": "08/07/2026", "fecha_ap_iso": "", "fecha_ap_label": "", "dias_apertura": null, "detectada": "2026-08-31", "corrida": "2026-08-31", "contacto": null}, {"fuente": "sibom", "comprador": "General San Martín", "objeto": "Decreto Nº00097/26 en el boletín 2040º de General San Martín", "fragmento": "Ampliando monto de obra Cubierta playón deportivo del Parque José Hernández y ampliando plazo de obra. ...", "texto": "Ampliando monto de obra Cubierta playón deportivo del Parque José Hernández y ampliando plazo de obra. ...", "ref": "Decreto Nº00097/26 en el boletín 2040º de General San Martín", "tipo": "", "id_origen": "https://sibom.slyt.gba.gob.ar/bulletins/15141/contents/2400537", "estado": "", "grupo": "ruido", "zona": "objetivo", "keywords": ["cubierta", "cubiertas"], "productos": ["Neumáticos"], "nueva": true, "url": "https://sibom.slyt.gba.gob.ar/bulletins/15141/contents/2400537", "fecha_pub_iso": "2026-06-04", "fecha_pub_label": "04/06/2026", "fecha_ap_iso": "", "fecha_ap_label": "", "dias_apertura": null, "detectada": "2026-08-28", "corrida": "2026-08-28", "contacto": null}, {"fuente": "pbac", "comprador": "103.13.4.1 - Dir. Pcial. Hospitales - Hospital M.V.De Martinez - Tigre", "objeto": "BATERIAS PARA GRUPO ELECTROGENO", "fragmento": "", "texto": "BATERIAS PARA GRUPO ELECTROGENO", "ref": "Proceso 2026-50-101-293", "tipo": "Procedimiento Abreviado", "id_origen": "2026-50-101-293", "estado": "publicado", "grupo": "ruido", "zona": "", "keywords": ["bateria"], "productos": ["Baterías"], "nueva": true, "url": "https://pbac.cgp.gba.gov.ar/ListarAperturaProxima.aspx", "fecha_pub_iso": "", "fecha_pub_label": "", "fecha_ap_iso": "2026-09-04", "fecha_ap_label": "04/09/2026 10:00", "dias_apertura": 4, "detectada": "2026-08-31", "corrida": "2026-08-31", "contacto": {"email": "", "telefono": "", "web_compras": "https://pbac.cgp.gba.gov.ar", "notas": "Portal de compras de la Provincia de Bs. As. El contacto puntual de la unidad ejecutora (mail/tel de la oficina de compras) figura DENTRO del pliego de cada proceso."}}]</script>
 <script id="proveedores-data" type="application/json">[{"nombre": "LAROCCA NEUMATICOS S.A.", "tipo": "proveedor / competidor", "detectado_como": "adjudicatario de concursos de precios de cubiertas", "visto_en": "Tandil; Mercedes (SIBOM)"}, {"nombre": "MHR NEUMATICOS S.R.L.", "tipo": "proveedor / competidor", "detectado_como": "oferente en concurso de precios de cubiertas", "visto_en": "Mercedes (SIBOM)"}, {"nombre": "SU LLANT S.A.", "tipo": "proveedor / competidor", "detectado_como": "oferente en licitacion de neumaticos/camaras/llantas", "visto_en": "Pilar (SIBOM)"}, {"nombre": "NEUMATICOS VERONA S.R.L.", "tipo": "proveedor / competidor", "detectado_como": "oferente en licitacion de neumaticos/camaras/llantas", "visto_en": "Pilar (SIBOM)"}, {"nombre": "PERLO AMERICO MAURICIO", "tipo": "proveedor / competidor", "detectado_como": "oferente en licitacion de neumaticos", "visto_en": "Pilar (SIBOM)"}, {"nombre": "ALFREDO IGNACIO CORRAL", "tipo": "proveedor / competidor", "detectado_como": "oferente (desestimado por falta de poliza)", "visto_en": "Pilar (SIBOM)"}, {"nombre": "DUHAU", "tipo": "proveedor de recapado", "detectado_como": "firma que recapa neumaticos para municipios del sudoeste", "visto_en": "Bahia Blanca / Coronel Pringles (SIBOM)"}, {"nombre": "COVYC S.A.", "tipo": "contratista de obra vial", "detectado_como": "adjudicatario de 'fresado y recapado con mezcla bituminosa'", "visto_en": "Avellaneda (SIBOM)"}]</script>
-<script id="meta-data" type="application/json">{"generado": "2026-08-31 18:52", "ultima_corrida": "2026-08-31", "total": 9, "abiertas": 2, "por_vencer": 0, "nuevas": 5, "cerradas": 3, "ruido": 4, "fuentes": ["pbac", "sibom"], "dias_nueva": 7}</script>
+<script id="meta-data" type="application/json">{"generado": "2026-08-31 19:15", "ultima_corrida": "2026-08-31", "total": 9, "abiertas": 2, "por_vencer": 0, "nuevas": 5, "cerradas": 3, "ruido": 4, "fuentes": ["pbac", "sibom"], "dias_nueva": 7}</script>
 <script>
 (function () {
   "use strict";
@@ -413,6 +463,63 @@
     return out.join("  ·  ");
   }
 
+  function detFila(k, v) {
+    return v ? '<div class="detail__k">' + esc(k) + '</div><div class="detail__v">' + v + "</div>" : "";
+  }
+
+  function contactoHTML(row) {
+    var c = row.contacto;
+    var q = encodeURIComponent((row.comprador || "") + " compras licitaciones proveedores contacto");
+    var buscar = '<a class="btn-buscar" href="https://www.google.com/search?q=' + q +
+      '" target="_blank" rel="noopener">Buscar contacto en la web</a>';
+    if (!c || (!c.email && !c.telefono && !c.web_compras)) {
+      return '<div class="contacto"><p class="contacto__t">Contacto</p>' +
+        '<p style="margin:0 0 8px">No hay un contacto cargado para este comprador. ' +
+        'El mail y el teléfono de la oficina de compras suelen figurar dentro del pliego.</p>' +
+        buscar + "</div>";
+    }
+    var r = "";
+    if (c.email)
+      r += '<div class="contacto__row"><b>Mail</b><a href="mailto:' + esc(c.email) + '">' + esc(c.email) + "</a></div>";
+    if (c.telefono)
+      r += '<div class="contacto__row"><b>Tel</b><a href="tel:' + esc(c.telefono.replace(/[^0-9+]/g, "")) +
+           '">' + esc(c.telefono) + "</a></div>";
+    if (c.web_compras)
+      r += '<div class="contacto__row"><b>Web</b><a href="' + esc(c.web_compras) +
+           '" target="_blank" rel="noopener">' + esc(c.web_compras) + "</a></div>";
+    if (c.notas)
+      r += '<div class="contacto__row" style="color:var(--ink-soft)">' + esc(c.notas) + "</div>";
+    return '<div class="contacto"><p class="contacto__t">Contacto de compras</p>' + r +
+      '<p style="margin:8px 0 0">' + buscar + "</p></div>";
+  }
+
+  function detalleHTML(row) {
+    var d = "";
+    d += detFila("Comprador", esc(row.comprador));
+    d += detFila("Objeto / referencia", esc(row.objeto));
+    d += detFila("Detalle del boletín", esc(row.fragmento));
+    d += detFila("Tipo de proceso", esc(row.tipo));
+    d += detFila("N° de proceso / expediente", esc(row.id_origen));
+    d += detFila("Fuente", esc(FUENTE_LABEL[row.fuente] || row.fuente));
+    d += detFila("Estado", esc(row.estado) ||
+      (row.grupo === "abierta" ? "abierta (sin confirmar)" : ""));
+    d += detFila("Zona", esc(ZONA_LABEL[row.zona] || ""));
+    d += detFila("Productos", esc((row.productos || []).join(", ")));
+    d += detFila("Palabras clave que la detectaron", esc((row.keywords || []).join(", ")));
+    d += detFila("Publicada", esc(row.fecha_pub_label));
+    d += detFila("Apertura de sobres", esc(row.fecha_ap_label));
+    d += detFila("Detectada por el radar", esc(row.detectada));
+    d += detFila("Vista por última vez", esc(row.corrida));
+    d += detFila("Pliego", row.url
+      ? '<a href="' + esc(row.url) + '" target="_blank" rel="noopener">Abrir en la fuente oficial ↗</a>'
+      : "sin link");
+    return '<div class="card__detail" hidden>' +
+      '<div class="detail">' + d + "</div>" +
+      contactoHTML(row) +
+      '<p class="detail__note">Datos sin verificar. Antes de presentarse, confirmá objeto, ' +
+      "fechas y condiciones en el pliego oficial.</p></div>";
+  }
+
   function renderCard(row) {
     var p = pill(row);
     var chips = [];
@@ -436,14 +543,17 @@
 
     return '' +
       '<article class="' + cardClass(row, p) + '">' +
-      '  <div class="card__top">' +
-      '    <h3 class="card__buyer">' + esc(row.comprador || "—") + "</h3>" +
-      '    <span>' + nueva + '<span class="pill pill--' + p.cls + '">' + esc(p.txt) + "</span></span>" +
-      "  </div>" +
+      '  <button class="card__head" type="button" aria-expanded="false">' +
+      '    <span class="card__buyer">' + esc(row.comprador || "—") + "</span>" +
+      '    <span class="card__pills">' + nueva +
+             '<span class="pill pill--' + p.cls + '">' + esc(p.txt) + "</span></span>" +
+      '    <span class="card__chevron" aria-hidden="true">▸</span>' +
+      "  </button>" +
       (row.texto ? '  <p class="card__object">' + esc(row.texto) + "</p>" : "") +
       (row.ref ? '  <p class="card__ref">' + esc(row.ref) + "</p>" : "") +
       '  <div class="card__chips">' + chips.join("") + "</div>" +
       '  <div class="card__foot"><span>' + (fechasLinea(row) || "sin fechas") + "</span>" + link + "</div>" +
+      detalleHTML(row) +
       "</article>";
   }
 
@@ -569,6 +679,14 @@
     state.tile = (state.tile === k) ? "" : k;
     if (state.tile === "ruido") document.getElementById("verRuido").checked = state.verRuido = true;
     renderResumen(); render();
+  });
+  document.getElementById("lista").addEventListener("click", function (e) {
+    var head = e.target.closest(".card__head"); if (!head) return;
+    var card = head.closest(".card");
+    var det = card.querySelector(".card__detail");
+    var abierto = card.classList.toggle("card--expanded");
+    head.setAttribute("aria-expanded", abierto ? "true" : "false");
+    if (det) det.hidden = !abierto;
   });
   document.getElementById("tema").addEventListener("click", function () {
     var actual = leerTema();

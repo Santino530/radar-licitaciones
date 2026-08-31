@@ -5,6 +5,7 @@ Genera el panel (dashboard) del radar de licitaciones a partir de los CSV del re
 Lee:
   data/radar_sin_verificar.csv   (salida del motor: lo que hay que revisar)
   data/proveedores_conocidos.csv (contexto: quien ya le vende al Estado)
+  data/contactos_compras.csv     (tabla manual: comprador -> mail/tel de compras)
 
 Escribe:
   web/dashboard.html   -> una pagina HTML autocontenida (datos embebidos como JSON)
@@ -65,9 +66,10 @@ def parse_fecha(s):
     return iso, label
 
 
-def cargar_radar():
+def cargar_radar(contactos=None):
     path = os.path.join(DATA, "radar_sin_verificar.csv")
     hoy = dt.date.today()
+    contactos = contactos or {}
     filas = []
     with open(path, newline="", encoding="utf-8") as f:
         for r in csv.DictReader(f):
@@ -92,12 +94,15 @@ def cargar_radar():
 
             fragmento = (r.get("fragmento") or "").strip()
             objeto = (r.get("objeto") or "").strip()
+            fuente = (r.get("fuente") or "").strip()
+            id_origen = (r.get("id_origen") or "").strip()
+            tipo = (r.get("tipo") or "").strip()
             texto = fragmento or objeto
             # referencia secundaria: si el texto principal es el fragmento, mostramos
             # el "objeto" (la cita del boletin / el nro de proceso) como referencia.
             ref = objeto if fragmento else ""
-            if not ref and r.get("fuente") == "pbac":
-                ref = f"Proceso {r.get('id_origen', '').strip()}"
+            if not ref and fuente in ("pbac", "bac"):
+                ref = f"Proceso {id_origen}"
 
             kws = [k.strip() for k in (r.get("keywords") or "").split(",") if k.strip()]
 
@@ -108,11 +113,16 @@ def cargar_radar():
             except ValueError:
                 pass
 
+            comprador = (r.get("comprador") or "").strip()
             filas.append({
-                "fuente": (r.get("fuente") or "").strip(),
-                "comprador": (r.get("comprador") or "").strip(),
+                "fuente": fuente,
+                "comprador": comprador,
+                "objeto": objeto,
+                "fragmento": fragmento,
                 "texto": texto,
                 "ref": ref,
+                "tipo": tipo,
+                "id_origen": id_origen,
                 "estado": estado,
                 "grupo": grupo,
                 "zona": (r.get("categoria_zona") or "").strip(),
@@ -127,6 +137,7 @@ def cargar_radar():
                 "dias_apertura": dias_apertura,
                 "detectada": detectada,
                 "corrida": (r.get("vista_ultima_corrida") or "").strip(),
+                "contacto": buscar_contacto(comprador, fuente, contactos),
             })
     return filas
 
@@ -169,6 +180,55 @@ def cargar_proveedores():
     return out
 
 
+def _clave_comprador(s):
+    """Normaliza el nombre del comprador para cruzar con contactos_compras.csv."""
+    s = (s or "").lower().strip()
+    for a, b in (("á", "a"), ("é", "e"), ("í", "i"), ("ó", "o"), ("ú", "u"), ("ñ", "n")):
+        s = s.replace(a, b)
+    s = re.sub(r"[^a-z0-9 ]", " ", s)
+    return re.sub(r"\s+", " ", s).strip()
+
+
+def cargar_contactos():
+    """comprador (normalizado) -> {email, telefono, web_compras, notas}.
+    contactos_compras.csv es una tabla de referencia manual: oficinas de compras
+    del sector publico (dato semi-publico, esta en las webs de cada organismo).
+    Arranca casi vacia y el equipo la va completando a medida que trabaja leads."""
+    path = os.path.join(DATA, "contactos_compras.csv")
+    out = {}
+    if not os.path.exists(path):
+        return out
+    with open(path, newline="", encoding="utf-8") as f:
+        for r in csv.DictReader(f):
+            k = _clave_comprador(r.get("comprador"))
+            if not k:
+                continue
+            out[k] = {
+                "email": (r.get("email") or "").strip(),
+                "telefono": (r.get("telefono") or "").strip(),
+                "web_compras": (r.get("web_compras") or "").strip(),
+                "notas": (r.get("notas") or "").strip(),
+            }
+    return out
+
+
+def buscar_contacto(comprador, fuente, contactos):
+    """Busca contacto por nombre de comprador; si no hay, cae al contacto general
+    de la fuente (PBAC / BAC)."""
+    if not contactos:
+        return None
+    k = _clave_comprador(comprador)
+    if k in contactos:
+        return contactos[k]
+    # match parcial: el comprador contiene (o esta contenido en) una clave cargada
+    for ck, cv in contactos.items():
+        if ck and (ck in k or k in ck) and len(ck) > 4:
+            return cv
+    if fuente and fuente.upper() in contactos:
+        return contactos[fuente.upper()]
+    return contactos.get(_clave_comprador(fuente))
+
+
 def construir_meta(filas):
     corridas = [f["corrida"] for f in filas if f["corrida"]]
     ultima = max(corridas) if corridas else ""
@@ -206,7 +266,8 @@ def main():
     ap.add_argument("--out", default=os.path.join(ROOT, "web", "dashboard.html"))
     args = ap.parse_args()
 
-    filas = ordenar(cargar_radar())
+    contactos = cargar_contactos()
+    filas = ordenar(cargar_radar(contactos))
     proveedores = cargar_proveedores()
     meta = construir_meta(filas)
 
@@ -392,11 +453,22 @@ PLANTILLA = r"""<title>Licitaciones de Neumáticos</title>
   .card--soon::before { background: var(--soon); }
   .card--noise::before { background: var(--noise); }
 
-  .card__top { display: flex; flex-wrap: wrap; gap: 8px; align-items: baseline; justify-content: space-between; }
+  .card__head {
+    appearance: none; width: 100%; background: none; border: 0; padding: 0;
+    margin: 0; cursor: pointer; color: inherit; font: inherit; text-align: left;
+    display: flex; flex-wrap: wrap; gap: 8px; align-items: baseline;
+  }
+  .card__head:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
   .card__buyer {
     font-family: "Libre Franklin", sans-serif; font-weight: 600; font-size: 1rem;
-    margin: 0; color: var(--ink);
+    margin: 0; color: var(--ink); flex: 1 1 auto;
   }
+  .card__pills { display: inline-flex; gap: 6px; align-items: baseline; flex: 0 0 auto; }
+  .card__chevron {
+    flex: 0 0 auto; color: var(--ink-soft); font-size: 12px; transition: transform 120ms ease;
+    align-self: center;
+  }
+  .card--expanded .card__chevron { transform: rotate(90deg); }
   .pill {
     font-family: "IBM Plex Mono", monospace; font-size: 10.5px; font-weight: 500;
     letter-spacing: .04em; text-transform: uppercase;
@@ -414,6 +486,44 @@ PLANTILLA = r"""<title>Licitaciones de Neumáticos</title>
   .card--flag::after {
     content: ""; position: absolute; inset: 0; border-radius: 10px;
     box-shadow: inset 0 0 0 1px var(--accent); pointer-events: none;
+  }
+
+  .card__detail {
+    margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line);
+  }
+  .detail {
+    display: grid; grid-template-columns: max-content 1fr; gap: 7px 16px;
+    font-size: 13px; margin-bottom: 12px;
+  }
+  .detail__k {
+    font-family: "IBM Plex Mono", monospace; font-size: 10.5px; letter-spacing: .04em;
+    text-transform: uppercase; color: var(--ink-soft); padding-top: 2px;
+  }
+  .detail__v { color: var(--ink); white-space: pre-wrap; word-break: break-word; }
+  .detail__v a { color: var(--accent); }
+  .contacto {
+    background: var(--surface-2); border: 1px solid var(--line); border-radius: 8px;
+    padding: 11px 13px; font-size: 13px;
+  }
+  .contacto__t {
+    font-family: "Libre Franklin", sans-serif; font-weight: 700; font-size: 12px;
+    text-transform: uppercase; letter-spacing: .03em; color: var(--ink-soft); margin: 0 0 7px;
+  }
+  .contacto__row { display: flex; flex-wrap: wrap; gap: 3px 8px; margin: 3px 0; align-items: baseline; }
+  .contacto__row b {
+    font-family: "IBM Plex Mono", monospace; font-size: 10.5px; text-transform: uppercase;
+    color: var(--ink-soft); font-weight: 500; flex: 0 0 62px;
+  }
+  .contacto a { color: var(--accent); word-break: break-all; }
+  .btn-buscar {
+    appearance: none; display: inline-block; margin-top: 4px;
+    background: var(--accent); color: var(--surface); text-decoration: none;
+    font-size: 12px; font-weight: 500; padding: 6px 11px; border-radius: 7px;
+  }
+  .detail__note { font-size: 11.5px; color: var(--ink-soft); margin: 10px 0 0; }
+  @media (max-width: 560px) {
+    .detail { grid-template-columns: 1fr; gap: 2px 0; }
+    .detail__k { padding-top: 8px; }
   }
 
   .card__object { margin: 8px 0 0; color: var(--ink); }
@@ -542,6 +652,7 @@ PLANTILLA = r"""<title>Licitaciones de Neumáticos</title>
   <details class="legend">
     <summary>Cómo leer este panel</summary>
     <div class="legend__body">
+      <span><b>Tocá el nombre del comprador</b> en cualquier tarjeta para desplegar el detalle completo del pliego y el contacto.</span>
       <span><span class="legend__dot" style="background:var(--accent)"></span><b>Nueva</b> — el motor la detectó en los últimos 7 días. Es lo que hay que mirar primero.</span>
       <span><span class="legend__dot" style="background:var(--open)"></span><b>Abierta</b> — llamado vigente, se puede presentar oferta.</span>
       <span><span class="legend__dot" style="background:var(--soon)"></span><b>Por vencer</b> — la apertura de sobres es en 21 días o menos.</span>
@@ -635,6 +746,63 @@ PLANTILLA = r"""<title>Licitaciones de Neumáticos</title>
     return out.join("  ·  ");
   }
 
+  function detFila(k, v) {
+    return v ? '<div class="detail__k">' + esc(k) + '</div><div class="detail__v">' + v + "</div>" : "";
+  }
+
+  function contactoHTML(row) {
+    var c = row.contacto;
+    var q = encodeURIComponent((row.comprador || "") + " compras licitaciones proveedores contacto");
+    var buscar = '<a class="btn-buscar" href="https://www.google.com/search?q=' + q +
+      '" target="_blank" rel="noopener">Buscar contacto en la web</a>';
+    if (!c || (!c.email && !c.telefono && !c.web_compras)) {
+      return '<div class="contacto"><p class="contacto__t">Contacto</p>' +
+        '<p style="margin:0 0 8px">No hay un contacto cargado para este comprador. ' +
+        'El mail y el teléfono de la oficina de compras suelen figurar dentro del pliego.</p>' +
+        buscar + "</div>";
+    }
+    var r = "";
+    if (c.email)
+      r += '<div class="contacto__row"><b>Mail</b><a href="mailto:' + esc(c.email) + '">' + esc(c.email) + "</a></div>";
+    if (c.telefono)
+      r += '<div class="contacto__row"><b>Tel</b><a href="tel:' + esc(c.telefono.replace(/[^0-9+]/g, "")) +
+           '">' + esc(c.telefono) + "</a></div>";
+    if (c.web_compras)
+      r += '<div class="contacto__row"><b>Web</b><a href="' + esc(c.web_compras) +
+           '" target="_blank" rel="noopener">' + esc(c.web_compras) + "</a></div>";
+    if (c.notas)
+      r += '<div class="contacto__row" style="color:var(--ink-soft)">' + esc(c.notas) + "</div>";
+    return '<div class="contacto"><p class="contacto__t">Contacto de compras</p>' + r +
+      '<p style="margin:8px 0 0">' + buscar + "</p></div>";
+  }
+
+  function detalleHTML(row) {
+    var d = "";
+    d += detFila("Comprador", esc(row.comprador));
+    d += detFila("Objeto / referencia", esc(row.objeto));
+    d += detFila("Detalle del boletín", esc(row.fragmento));
+    d += detFila("Tipo de proceso", esc(row.tipo));
+    d += detFila("N° de proceso / expediente", esc(row.id_origen));
+    d += detFila("Fuente", esc(FUENTE_LABEL[row.fuente] || row.fuente));
+    d += detFila("Estado", esc(row.estado) ||
+      (row.grupo === "abierta" ? "abierta (sin confirmar)" : ""));
+    d += detFila("Zona", esc(ZONA_LABEL[row.zona] || ""));
+    d += detFila("Productos", esc((row.productos || []).join(", ")));
+    d += detFila("Palabras clave que la detectaron", esc((row.keywords || []).join(", ")));
+    d += detFila("Publicada", esc(row.fecha_pub_label));
+    d += detFila("Apertura de sobres", esc(row.fecha_ap_label));
+    d += detFila("Detectada por el radar", esc(row.detectada));
+    d += detFila("Vista por última vez", esc(row.corrida));
+    d += detFila("Pliego", row.url
+      ? '<a href="' + esc(row.url) + '" target="_blank" rel="noopener">Abrir en la fuente oficial ↗</a>'
+      : "sin link");
+    return '<div class="card__detail" hidden>' +
+      '<div class="detail">' + d + "</div>" +
+      contactoHTML(row) +
+      '<p class="detail__note">Datos sin verificar. Antes de presentarse, confirmá objeto, ' +
+      "fechas y condiciones en el pliego oficial.</p></div>";
+  }
+
   function renderCard(row) {
     var p = pill(row);
     var chips = [];
@@ -658,14 +826,17 @@ PLANTILLA = r"""<title>Licitaciones de Neumáticos</title>
 
     return '' +
       '<article class="' + cardClass(row, p) + '">' +
-      '  <div class="card__top">' +
-      '    <h3 class="card__buyer">' + esc(row.comprador || "—") + "</h3>" +
-      '    <span>' + nueva + '<span class="pill pill--' + p.cls + '">' + esc(p.txt) + "</span></span>" +
-      "  </div>" +
+      '  <button class="card__head" type="button" aria-expanded="false">' +
+      '    <span class="card__buyer">' + esc(row.comprador || "—") + "</span>" +
+      '    <span class="card__pills">' + nueva +
+             '<span class="pill pill--' + p.cls + '">' + esc(p.txt) + "</span></span>" +
+      '    <span class="card__chevron" aria-hidden="true">▸</span>' +
+      "  </button>" +
       (row.texto ? '  <p class="card__object">' + esc(row.texto) + "</p>" : "") +
       (row.ref ? '  <p class="card__ref">' + esc(row.ref) + "</p>" : "") +
       '  <div class="card__chips">' + chips.join("") + "</div>" +
       '  <div class="card__foot"><span>' + (fechasLinea(row) || "sin fechas") + "</span>" + link + "</div>" +
+      detalleHTML(row) +
       "</article>";
   }
 
@@ -791,6 +962,14 @@ PLANTILLA = r"""<title>Licitaciones de Neumáticos</title>
     state.tile = (state.tile === k) ? "" : k;
     if (state.tile === "ruido") document.getElementById("verRuido").checked = state.verRuido = true;
     renderResumen(); render();
+  });
+  document.getElementById("lista").addEventListener("click", function (e) {
+    var head = e.target.closest(".card__head"); if (!head) return;
+    var card = head.closest(".card");
+    var det = card.querySelector(".card__detail");
+    var abierto = card.classList.toggle("card--expanded");
+    head.setAttribute("aria-expanded", abierto ? "true" : "false");
+    if (det) det.hidden = !abierto;
   });
   document.getElementById("tema").addEventListener("click", function () {
     var actual = leerTema();

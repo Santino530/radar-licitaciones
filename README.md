@@ -114,7 +114,11 @@ de apertura, estado y link al pliego.
     (AMBA) y "volumen_alto" (partidos del interior con Dirección Vial grande), filtro de
     ruido, ventana de días.
   - `src/pbac_mvp.py` — "apertura próxima" de toda la Provincia, vía el botón
-    "Descargar Reporte Excel" (una request → xlsx con ~467 procesos).
+    "Descargar Reporte Excel" (una request → xlsx con ~400-470 procesos).
+  - `src/bac_mvp.py` — "apertura próxima" de la Ciudad de Buenos Aires (BAC). Es el
+    mismo software que PBAC; reutiliza casi todo de `pbac_mvp.py`. Diferencias: hay que
+    pedir la página dos veces (la 1ª rebota para crear la sesión) y mandar un token
+    anti-CSRF extra.
 - **Motor / orquestador:** `src/radar.py` corre todos los conectores, normaliza a
   `data/radar_sin_verificar.csv` y marca lo **nuevo respecto de la corrida anterior**
   (`primera_vez_visto` = "nueva apertura").
@@ -125,22 +129,19 @@ de apertura, estado y link al pliego.
   quien tenga que verlo. Versión 1: sólo lectura (ver, filtrar, ordenar). Falta: que se
   actualice solo con los datos nuevos de GitHub, y los botones de ✓/✗ para triar desde
   la página.
-- **Falta:** conectores CABA / Nación / Boletín provincial, auto-actualización del panel
-  + notificación push, y subir el repo a GitHub.
+- **Falta:** conectores Nación / Boletín provincial / portales municipales,
+  auto-actualización del panel + notificación push, y subir el repo a GitHub.
 
 ## 10. Próximos pasos
 
 1. Subir el repo a un GitHub privado y probar el workflow con "Run workflow" a mano.
-2. Conector `bac` (CABA): el listado de procesos y aperturas de
-   `buenosairescompras.gob.ar` es público sin cuenta; se modela sobre `pbac_mvp.py`
-   (misma familia de software). Los datos abiertos OCDS de CABA se actualizan sólo
-   **trimestralmente** → no sirven para el radar diario, sólo para análisis histórico.
-3. Portales municipales de los partidos del AMBA que no publican en SIBOM.
-4. Conector `comprar` (Nación) y, como respaldo legal, el Boletín Oficial PBA.
-5. Afinar filtros de ruido y palabras clave con lo que vaya juntando el radar
-   (hecho una primera vez el 2026-08-31: ruido "playón deportivo", estado inferido
-   `adjudicada` / `cerrada`).
-6. Dashboard web (Artifact) + `PushNotification`, reusando el molde de `busqueda-laboral`.
+2. Que el panel se actualice solo: una rutina en la nube que hace `git pull`, corre
+   `build_dashboard.py` y republica el Artifact con la misma URL.
+3. Conector `comprar` (Nación, COMPR.AR) — tiene API/OCDS real.
+4. Portales municipales de los partidos del AMBA que no publican en SIBOM; Boletín
+   Oficial PBA como respaldo legal.
+5. Botones ✓/✗ en el panel para triar desde la página (capacidad `artifact`).
+6. Afinar filtros de ruido y palabras clave con lo que vaya juntando el radar.
 7. Confirmar con la empresa con qué CUIT / sector (San Justo Neumáticos S.R.L. o Centro
    Integral de Neumáticos) se presenta a licitaciones.
 
@@ -165,8 +166,9 @@ de apertura, estado y link al pliego.
         planilla_*.csv                ← export de la Google Sheet (ignorado por git)
     /src
         radar.py       ← orquestador: corre todo y arma radar_sin_verificar.csv
-        sibom_mvp.py    ← conector SIBOM
-        pbac_mvp.py     ← conector PBAC
+        sibom_mvp.py    ← conector SIBOM (boletines municipales PBA)
+        pbac_mvp.py     ← conector PBAC (compras Provincia de Bs. As.)
+        bac_mvp.py      ← conector BAC (compras Ciudad de Bs. As.)
     /scripts
         build_dashboard.py  ← arma web/dashboard.html desde los CSV
     /web

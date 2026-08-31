@@ -30,6 +30,25 @@ DATA = os.path.join(ROOT, "data")
 
 FECHA_RE = re.compile(r"(\d{2})/(\d{2})/(\d{4})(?:\s+(\d{1,2}):(\d{2}))?")
 
+# Palabra clave -> categoria de producto (para el filtro del panel). Una fila puede
+# caer en varias. El orden define como se muestran.
+CATEGORIA_PRODUCTO = [
+    ("Neumáticos", ("neumatic", "cubierta", "recapado", "recauchut", "gomeria", "vulcaniz")),
+    ("Llantas", ("llanta",)),
+    ("Cámaras", ("camara",)),
+    ("Baterías", ("bateria", "acumulador")),
+    ("Protectores", ("protector",)),
+]
+DIAS_NUEVA = 7  # una deteccion de los ultimos N dias se marca "nueva"
+
+
+def productos_de(keywords):
+    out = []
+    for label, needles in CATEGORIA_PRODUCTO:
+        if any(any(n in k.lower() for n in needles) for k in keywords):
+            out.append(label)
+    return out or ["Otros"]
+
 
 def parse_fecha(s):
     """'dd/mm/aaaa' o 'dd/mm/aaaa HH:MM Hrs.' -> (iso 'aaaa-mm-dd', label legible)."""
@@ -82,6 +101,13 @@ def cargar_radar():
 
             kws = [k.strip() for k in (r.get("keywords") or "").split(",") if k.strip()]
 
+            detectada = (r.get("primera_vez_visto") or "").strip()
+            nueva = False
+            try:
+                nueva = (hoy - dt.date.fromisoformat(detectada)).days <= DIAS_NUEVA
+            except ValueError:
+                pass
+
             filas.append({
                 "fuente": (r.get("fuente") or "").strip(),
                 "comprador": (r.get("comprador") or "").strip(),
@@ -91,13 +117,15 @@ def cargar_radar():
                 "grupo": grupo,
                 "zona": (r.get("categoria_zona") or "").strip(),
                 "keywords": kws,
+                "productos": productos_de(kws),
+                "nueva": nueva,
                 "url": (r.get("url") or "").strip(),
                 "fecha_pub_iso": pub_iso or "",
                 "fecha_pub_label": pub_label,
                 "fecha_ap_iso": ap_iso or "",
                 "fecha_ap_label": ap_label,
                 "dias_apertura": dias_apertura,
-                "detectada": (r.get("primera_vez_visto") or "").strip(),
+                "detectada": detectada,
                 "corrida": (r.get("vista_ultima_corrida") or "").strip(),
             })
     return filas
@@ -153,8 +181,11 @@ def construir_meta(filas):
         "total": len(filas),
         "abiertas": len(abiertas),
         "por_vencer": len(por_vencer),
+        "nuevas": sum(1 for f in filas if f["nueva"] and f["grupo"] != "ruido"),
         "cerradas": sum(1 for f in filas if f["grupo"] == "cerrada"),
         "ruido": sum(1 for f in filas if f["grupo"] == "ruido"),
+        "fuentes": sorted({f["fuente"] for f in filas if f["fuente"]}),
+        "dias_nueva": DIAS_NUEVA,
     }
 
 
@@ -265,12 +296,21 @@ PLANTILLA = r"""<title>Licitaciones de Neumáticos</title>
     font-size: 11px; letter-spacing: .14em; text-transform: uppercase;
     color: var(--accent); margin: 0 0 6px;
   }
+  .masthead__bar { display: flex; align-items: flex-start; gap: 12px; justify-content: space-between; }
   .masthead__title {
     font-family: "Libre Franklin", sans-serif; font-weight: 700;
     font-size: clamp(1.6rem, 4vw, 2.15rem); line-height: 1.1;
     margin: 0; text-wrap: balance;
   }
   .masthead__sub { color: var(--ink-soft); margin: 8px 0 0; max-width: 62ch; }
+  .theme-toggle {
+    flex: 0 0 auto; appearance: none; cursor: pointer;
+    background: var(--surface); border: 1px solid var(--line); border-radius: 8px;
+    color: var(--ink-soft); font: inherit; font-size: 13px; padding: 6px 10px;
+    display: inline-flex; align-items: center; gap: 6px;
+    transition: border-color 120ms ease, color 120ms ease;
+  }
+  .theme-toggle:hover { border-color: var(--accent); color: var(--ink); }
   .masthead__meta {
     font-family: "IBM Plex Mono", monospace; font-size: 12px;
     color: var(--ink-soft); margin-top: 12px; display: flex; flex-wrap: wrap; gap: 4px 18px;
@@ -304,6 +344,7 @@ PLANTILLA = r"""<title>Licitaciones de Neumáticos</title>
   }
   .tile--soon .tile__n { color: var(--soon); }
   .tile--open .tile__n { color: var(--open); }
+  .tile--nueva .tile__n { color: var(--accent); }
 
   .controls {
     display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
@@ -366,6 +407,14 @@ PLANTILLA = r"""<title>Licitaciones de Neumáticos</title>
   .pill--soon { color: var(--soon); }
   .pill--closed { color: var(--closed); }
   .pill--noise { color: var(--noise); }
+  .pill--nueva {
+    color: var(--surface); background: var(--accent); border-color: var(--accent);
+  }
+  .card--flag { border-color: var(--accent); }
+  .card--flag::after {
+    content: ""; position: absolute; inset: 0; border-radius: 10px;
+    box-shadow: inset 0 0 0 1px var(--accent); pointer-events: none;
+  }
 
   .card__object { margin: 8px 0 0; color: var(--ink); }
   .card__ref {
@@ -422,22 +471,47 @@ PLANTILLA = r"""<title>Licitaciones de Neumáticos</title>
     padding: 10px 13px; color: var(--ink); margin: 14px 0;
   }
 
+  .legend {
+    background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px;
+    padding: 0 16px; margin-bottom: 26px; font-size: 13px;
+  }
+  .legend > summary {
+    cursor: pointer; padding: 12px 0; color: var(--ink-soft);
+    font-family: "Libre Franklin", sans-serif; font-weight: 600; list-style: none;
+  }
+  .legend > summary::-webkit-details-marker { display: none; }
+  .legend > summary::before { content: "▸ "; color: var(--accent); }
+  .legend[open] > summary::before { content: "▾ "; }
+  .legend__body { padding: 0 0 14px; display: flex; flex-direction: column; gap: 7px; color: var(--ink-soft); }
+  .legend__body b { color: var(--ink); font-weight: 600; }
+  .legend__dot {
+    display: inline-block; width: 9px; height: 9px; border-radius: 2px;
+    margin-right: 6px; vertical-align: middle;
+  }
+
   @media (prefers-reduced-motion: reduce) {
     * { transition: none !important; }
   }
   @media (max-width: 560px) {
     .wrap { padding: 24px 14px 48px; }
     .card__link { margin-left: 0; }
+    .masthead__bar { flex-wrap: wrap; }
   }
 </style>
 
 <div class="wrap">
   <header class="masthead">
     <p class="masthead__eyebrow">Sector público · actualización diaria</p>
-    <h1 class="masthead__title">Radar de Licitaciones — Neumáticos</h1>
+    <div class="masthead__bar">
+      <h1 class="masthead__title">Radar de Licitaciones — Neumáticos</h1>
+      <button type="button" class="theme-toggle" id="tema" aria-label="Cambiar tema">
+        <span id="temaIcon">◐</span> <span id="temaTxt">Tema</span>
+      </button>
+    </div>
     <p class="masthead__sub">
-      Licitaciones públicas de neumáticos, recapado, cámaras, baterías de vehículo y
-      protectores, en municipios de la Provincia de Buenos Aires y el Estado provincial.
+      Licitaciones públicas de neumáticos, recapado, llantas, cámaras, baterías de
+      vehículo y protectores, en municipios de la Provincia de Buenos Aires, el Estado
+      provincial y la Ciudad de Buenos Aires.
     </p>
     <p class="masthead__meta" id="meta"></p>
   </header>
@@ -446,6 +520,14 @@ PLANTILLA = r"""<title>Licitaciones de Neumáticos</title>
 
   <div class="controls">
     <input type="search" id="q" placeholder="Buscar comprador, objeto, palabra clave…" aria-label="Buscar">
+    <select id="producto" aria-label="Filtrar por producto">
+      <option value="">Todos los productos</option>
+      <option value="Neumáticos">Neumáticos</option>
+      <option value="Llantas">Llantas</option>
+      <option value="Cámaras">Cámaras</option>
+      <option value="Baterías">Baterías</option>
+      <option value="Protectores">Protectores</option>
+    </select>
     <select id="zona" aria-label="Filtrar por zona">
       <option value="">Todas las zonas</option>
       <option value="objetivo">Zona objetivo (AMBA + La Plata)</option>
@@ -457,6 +539,18 @@ PLANTILLA = r"""<title>Licitaciones de Neumáticos</title>
     </label>
   </div>
 
+  <details class="legend">
+    <summary>Cómo leer este panel</summary>
+    <div class="legend__body">
+      <span><span class="legend__dot" style="background:var(--accent)"></span><b>Nueva</b> — el motor la detectó en los últimos 7 días. Es lo que hay que mirar primero.</span>
+      <span><span class="legend__dot" style="background:var(--open)"></span><b>Abierta</b> — llamado vigente, se puede presentar oferta.</span>
+      <span><span class="legend__dot" style="background:var(--soon)"></span><b>Por vencer</b> — la apertura de sobres es en 21 días o menos.</span>
+      <span><span class="legend__dot" style="background:var(--closed)"></span><b>Adjudicada / cerrada</b> — ya no se puede ofertar; sirve para ver competencia.</span>
+      <span><span class="legend__dot" style="background:var(--noise)"></span><b>Descartada</b> — el filtro la marcó como falso positivo (cámara de video, batería de generador, recapado de asfalto…).</span>
+      <span>Los datos vienen sin verificar. Antes de presentarse, siempre abrir el pliego en la fuente oficial.</span>
+    </div>
+  </details>
+
   <main id="lista"></main>
 
   <aside class="aside" id="proveedores"></aside>
@@ -467,8 +561,8 @@ PLANTILLA = r"""<title>Licitaciones de Neumáticos</title>
       abrir el pliego en la fuente oficial y confirmar objeto, fechas y condiciones.
     </div>
     <p><b>Qué cubre hoy:</b> <span id="cobertura"></span></p>
-    <p><b>Falta sumar:</b> CABA (portal BAC), Nación (COMPR.AR), portales propios de
-      municipios que no publican en SIBOM, y el Boletín Oficial de la Provincia como respaldo.</p>
+    <p><b>Falta sumar:</b> Nación (COMPR.AR), portales propios de municipios que no
+      publican en SIBOM, y el Boletín Oficial de la Provincia como respaldo.</p>
     <p id="pie"></p>
   </footer>
 </div>
@@ -486,9 +580,25 @@ PLANTILLA = r"""<title>Licitaciones de Neumáticos</title>
   var ZONA_LABEL = {
     objetivo: "Zona objetivo", volumen_alto: "Volumen alto", fuera: "Fuera de zona"
   };
-  var FUENTE_LABEL = { sibom: "SIBOM", pbac: "PBAC" };
+  var FUENTE_LABEL = { sibom: "SIBOM", pbac: "PBAC", bac: "BAC · CABA" };
 
-  var state = { q: "", zona: "", verRuido: false, tile: "" };
+  var state = { q: "", zona: "", producto: "", verRuido: false, tile: "" };
+
+  // --- Tema (claro / oscuro / auto), recordado por navegador -----------------
+  var TEMAS = ["auto", "light", "dark"];
+  var TEMA_LABEL = { auto: "Auto", light: "Claro", dark: "Oscuro" };
+  var TEMA_ICON = { auto: "◐", light: "☀", dark: "☾" };
+
+  function leerTema() {
+    try { return localStorage.getItem("radar-tema") || "auto"; } catch (e) { return "auto"; }
+  }
+  function aplicarTema(t) {
+    if (t === "auto") document.documentElement.removeAttribute("data-theme");
+    else document.documentElement.setAttribute("data-theme", t);
+    var i = document.getElementById("temaIcon"), x = document.getElementById("temaTxt");
+    if (i) i.textContent = TEMA_ICON[t];
+    if (x) x.textContent = TEMA_LABEL[t];
+  }
 
   function esc(s) {
     return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) {
@@ -509,10 +619,12 @@ PLANTILLA = r"""<title>Licitaciones de Neumáticos</title>
   }
 
   function cardClass(row, p) {
-    if (row.grupo === "ruido") return "card card--noise";
-    if (p.cls === "soon") return "card card--soon";
-    if (row.grupo === "abierta") return "card card--open";
-    return "card";
+    var c = "card";
+    if (row.grupo === "ruido") c += " card--noise";
+    else if (p.cls === "soon") c += " card--soon";
+    else if (row.grupo === "abierta") c += " card--open";
+    if (row.nueva && row.grupo !== "ruido") c += " card--flag";
+    return c;
   }
 
   function fechasLinea(row) {
@@ -531,6 +643,9 @@ PLANTILLA = r"""<title>Licitaciones de Neumáticos</title>
     if (row.zona && ZONA_LABEL[row.zona]) {
       chips.push('<span class="chip chip--zone">' + esc(ZONA_LABEL[row.zona]) + "</span>");
     }
+    (row.productos || []).forEach(function (pr) {
+      chips.push('<span class="chip chip--zone">' + esc(pr) + "</span>");
+    });
     (row.keywords || []).forEach(function (k) {
       chips.push('<span class="chip">' + esc(k) + "</span>");
     });
@@ -538,12 +653,14 @@ PLANTILLA = r"""<title>Licitaciones de Neumáticos</title>
     var link = row.url
       ? '<a class="card__link" href="' + esc(row.url) + '" target="_blank" rel="noopener">Ver en la fuente ↗</a>'
       : "";
+    var nueva = (row.nueva && row.grupo !== "ruido")
+      ? '<span class="pill pill--nueva">Nueva</span> ' : "";
 
     return '' +
       '<article class="' + cardClass(row, p) + '">' +
       '  <div class="card__top">' +
       '    <h3 class="card__buyer">' + esc(row.comprador || "—") + "</h3>" +
-      '    <span class="pill pill--' + p.cls + '">' + esc(p.txt) + "</span>" +
+      '    <span>' + nueva + '<span class="pill pill--' + p.cls + '">' + esc(p.txt) + "</span></span>" +
       "  </div>" +
       (row.texto ? '  <p class="card__object">' + esc(row.texto) + "</p>" : "") +
       (row.ref ? '  <p class="card__ref">' + esc(row.ref) + "</p>" : "") +
@@ -554,12 +671,14 @@ PLANTILLA = r"""<title>Licitaciones de Neumáticos</title>
 
   function pasaFiltro(row) {
     if (state.zona && row.zona !== state.zona) return false;
+    if (state.producto && (row.productos || []).indexOf(state.producto) === -1) return false;
     if (state.q) {
       var hay = (row.comprador + " " + row.texto + " " + row.ref + " " +
                  (row.keywords || []).join(" ")).toLowerCase();
       if (hay.indexOf(state.q.toLowerCase()) === -1) return false;
     }
     if (state.tile === "abiertas" && row.grupo !== "abierta") return false;
+    if (state.tile === "nuevas" && !(row.nueva && row.grupo !== "ruido")) return false;
     if (state.tile === "porvencer") {
       if (row.grupo !== "abierta") return false;
       var d = row.dias_apertura;
@@ -568,6 +687,10 @@ PLANTILLA = r"""<title>Licitaciones de Neumáticos</title>
     if (state.tile === "cerradas" && row.grupo !== "cerrada") return false;
     if (state.tile === "ruido" && row.grupo !== "ruido") return false;
     return true;
+  }
+
+  function nuevasPrimero(a, b) {
+    return (a.nueva ? 0 : 1) - (b.nueva ? 0 : 1);
   }
 
   function seccion(titulo, nota, filas) {
@@ -583,12 +706,13 @@ PLANTILLA = r"""<title>Licitaciones de Neumáticos</title>
 
   function render() {
     var vis = RADAR.filter(pasaFiltro);
-    var abiertas = vis.filter(function (r) { return r.grupo === "abierta"; });
+    var abiertas = vis.filter(function (r) { return r.grupo === "abierta"; }).slice().sort(nuevasPrimero);
     var cerradas = vis.filter(function (r) { return r.grupo === "cerrada"; });
     var ruido = vis.filter(function (r) { return r.grupo === "ruido"; });
 
     var html = seccion("Oportunidades abiertas",
-      "Ordenadas por fecha de apertura: las más próximas a vencer, primero.", abiertas);
+      "Las nuevas (detectadas en los últimos " + META.dias_nueva + " días) van primero; " +
+      "después, por fecha de apertura más próxima.", abiertas);
     html += seccion("Adjudicadas y cerradas",
       "No son oportunidades para presentarse. Sirven para saber quién compra y quién gana.",
       cerradas);
@@ -604,6 +728,7 @@ PLANTILLA = r"""<title>Licitaciones de Neumáticos</title>
   function renderResumen() {
     var tiles = [
       { k: "", n: META.total, l: "En el radar" },
+      { k: "nuevas", n: META.nuevas, l: "Nuevas (" + META.dias_nueva + " d)", mod: "nueva" },
       { k: "abiertas", n: META.abiertas, l: "Abiertas", mod: "open" },
       { k: "porvencer", n: META.por_vencer, l: "Por vencer (≤21 d)", mod: "soon" },
       { k: "cerradas", n: META.cerradas, l: "Adjudicadas" },
@@ -619,14 +744,17 @@ PLANTILLA = r"""<title>Licitaciones de Neumáticos</title>
 
   function renderMeta() {
     var m = document.getElementById("meta");
+    var fuentes = (META.fuentes || []).map(function (f) {
+      return FUENTE_LABEL[f] ? FUENTE_LABEL[f].split(" ")[0] : f.toUpperCase();
+    }).join(" + ") || "—";
     m.innerHTML =
       "Última corrida del motor: <b>" + esc(META.ultima_corrida || "s/d") + "</b>" +
       "<span>Página generada: <b>" + esc(META.generado) + "</b></span>" +
-      "<span>Fuentes: <b>SIBOM + PBAC</b></span>";
+      "<span>Fuentes: <b>" + esc(fuentes) + "</b></span>";
     document.getElementById("cobertura").textContent =
       "135 municipios de la Provincia de Buenos Aires (vía SIBOM, el boletín oficial " +
-      "municipal compartido) y el Estado provincial —ministerios, Vialidad, hospitales, " +
-      "organismos y municipios adheridos— vía PBAC.";
+      "municipal compartido); el Estado provincial —ministerios, Vialidad, hospitales, " +
+      "organismos y municipios adheridos— vía PBAC; y la Ciudad de Buenos Aires vía BAC.";
     document.getElementById("pie").textContent =
       "Radar de Licitaciones · proyecto interno · datos de fuentes oficiales del Estado.";
   }
@@ -648,6 +776,9 @@ PLANTILLA = r"""<title>Licitaciones de Neumáticos</title>
   document.getElementById("q").addEventListener("input", function (e) {
     state.q = e.target.value; render();
   });
+  document.getElementById("producto").addEventListener("change", function (e) {
+    state.producto = e.target.value; render();
+  });
   document.getElementById("zona").addEventListener("change", function (e) {
     state.zona = e.target.value; render();
   });
@@ -661,7 +792,14 @@ PLANTILLA = r"""<title>Licitaciones de Neumáticos</title>
     if (state.tile === "ruido") document.getElementById("verRuido").checked = state.verRuido = true;
     renderResumen(); render();
   });
+  document.getElementById("tema").addEventListener("click", function () {
+    var actual = leerTema();
+    var prox = TEMAS[(TEMAS.indexOf(actual) + 1) % TEMAS.length];
+    try { localStorage.setItem("radar-tema", prox); } catch (e) {}
+    aplicarTema(prox);
+  });
 
+  aplicarTema(leerTema());
   renderMeta();
   renderResumen();
   renderProveedores();

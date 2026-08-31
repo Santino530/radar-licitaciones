@@ -41,6 +41,7 @@ CAMPOS = [
 ]
 
 sys.path.insert(0, HERE)
+import bac_mvp  # noqa: E402
 import pbac_mvp  # noqa: E402
 import sibom_mvp  # noqa: E402
 
@@ -68,10 +69,12 @@ def de_sibom(incluir_ruido, dias=90):
         }
 
 
-def de_pbac(incluir_ruido):
-    for r in pbac_mvp.recolectar(incluir_ruido=incluir_ruido, verbose=True):
+def _filas_comprar(items, fuente, url):
+    """PBAC y BAC son el mismo software (Compr.ar) y devuelven el mismo dict.
+    Esta funcion normaliza los dos al formato del radar."""
+    for r in items:
         yield {
-            "fuente": "pbac",
+            "fuente": fuente,
             "id_origen": r["nro_proceso"],
             "comprador": r["unidad_ejecutora"],
             "objeto": r["nombre"],
@@ -82,12 +85,24 @@ def de_pbac(incluir_ruido):
             "categoria_zona": "",
             "es_ruido": "si" if r["es_ruido"] else "no",
             "keywords": r["keywords_match"],
-            "url": "https://pbac.cgp.gba.gov.ar/ListarAperturaProxima.aspx",
+            "url": url,
             "fragmento": "",
         }
 
 
-CONECTORES = {"sibom": de_sibom, "pbac": de_pbac}
+def de_pbac(incluir_ruido):
+    yield from _filas_comprar(
+        pbac_mvp.recolectar(incluir_ruido=incluir_ruido, verbose=True),
+        "pbac", "https://pbac.cgp.gba.gov.ar/ListarAperturaProxima.aspx")
+
+
+def de_bac(incluir_ruido):
+    yield from _filas_comprar(
+        bac_mvp.recolectar(incluir_ruido=incluir_ruido, verbose=True),
+        "bac", "https://www.buenosairescompras.gob.ar/ListarAperturaProxima.aspx")
+
+
+CONECTORES = {"sibom": de_sibom, "pbac": de_pbac, "bac": de_bac}
 
 
 def reclasificar(row):
@@ -101,7 +116,7 @@ def reclasificar(row):
         est = sibom_mvp.detectar_estado(texto)
         if est:
             row["estado"] = est
-    elif row.get("fuente") == "pbac":
+    elif row.get("fuente") in ("pbac", "bac"):
         row["es_ruido"] = "si" if pbac_mvp.es_ruido(texto) else "no"
 
 
@@ -147,10 +162,11 @@ def main():
             nuevas.append(row)
         row["vista_ultima_corrida"] = hoy
 
-    # Filas del radar anterior que hoy no aparecieron (p. ej. ya cerraron): se
-    # conservan si son de PBAC/apertura (para tener historial), marcando que no se vieron.
-    solo_antes = [previo[k] for k in previo if k not in encontrados
-                  and (not args.solo or previo[k]["fuente"] == args.solo)]
+    # Filas del radar anterior que hoy no volvieron a aparecer: se conservan (para
+    # tener historial). OJO: con --solo se corre un solo conector, asi que las filas
+    # de las OTRAS fuentes tambien caen aca y hay que mantenerlas intactas -> no se
+    # filtran por fuente.
+    solo_antes = [previo[k] for k in previo if k not in encontrados]
     for row in solo_antes:
         reclasificar(row)
 

@@ -11,5 +11,9 @@ __pycache__/
 data/planilla_*.csv
 data/sheet.html
 
-# dumps crudos opcionales del conector PBAC
+# dumps crudos opcionales de los conectores de compras
 data/pbac_ReporteProcesos.xlsx
+data/bac_ReporteProcesos.xlsx
+
+# salidas de prueba de los conectores sueltos (el radar usa radar_sin_verificar.csv)
+data/mvp_*.csv

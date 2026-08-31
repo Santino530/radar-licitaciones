@@ -49,6 +49,7 @@ UA = {"User-Agent": "Mozilla/5.0 (radar-licitaciones MVP; contacto interno)",
 KEYWORDS = [
     "neumatic", "cubierta", "camara", "llanta", "recapado", "recauchut",
     "gomeria", "vulcaniz",
+    "bateria", "acumulador", "protector",   # baterias de vehiculo, protectores de neumatico
 ]
 
 # Ruido: aparece la palabra clave pero NO es una compra de neumaticos para la flota.
@@ -59,6 +60,23 @@ RUIDO_PATRONES = [
     "camara de frio", "camara gesell", "camara digital", "camara fotograf",
     "camara de conservacion", "mantenimiento y reparacion de camara",  # camaras de frio de hospitales
     "camara de flujo", "camara de bioseguridad", "camara hiperbarica",
+    "camara de seguridad", "camaras de seguridad", "camara de vigilancia",
+    "camaras de vigilancia", "videovigilancia", "video vigilancia",
+    "camara septica", "camara de inspeccion", "camara subterranea",
+    "camara de bombeo", "camara transformadora", "camara reductora",
+    "camara de aire acondicionado",
+    # "protector" que NO es de neumatico (mayormente EPP / salud, y PBAC es hospital-heavy)
+    "protector facial", "protector ocular", "protector bucal", "protector auditivo",
+    "protector solar", "protector labial", "protector de colchon",
+    "protector de pantalla", "protector gastrico", "protector plomado",
+    "protector radiologico", "protector dental", "protector de calzado",
+    "protector mamario", "protector genital",
+    # "bateria" / "acumulador" que NO es de vehiculo
+    "bateria de cocina", "bateria sanitaria", "bateria de bano", "bateria de pozo",
+    "bateria para ups", "bateria de ups", "bateria de emergencia", "bateria solar",
+    "banco de baterias", "bateria de notebook", "bateria de tests",
+    "bateria de pruebas", "acumulador hidraulic", "acumulador de calor",
+    "tanque acumulador", "termotanque",
 ]
 
 

@@ -34,9 +34,11 @@ de apertura, estado y link al pliego.
 **Incluye:**
 - Los municipios y organismos del AMBA que figuran en la hoja *Prospectos* del Excel
   (los que tienen *Modalidad de compra = licitación pública*).
-- Licitaciones, contrataciones y compras cuyo objeto sea neumáticos, cubiertas, cámaras,
-  llantas, recapado / recauchutaje, o servicio de gomería (alineación, balanceo,
-  reparación de cubiertas).
+- Licitaciones, contrataciones y compras cuyo objeto sea:
+  - **Principal:** neumáticos, cubiertas, llantas, recapado / recauchutaje, o servicio
+    de gomería (alineación, balanceo, reparación de cubiertas).
+  - **Secundario** (otros productos que la empresa también vende): baterías de auto /
+    camión, cámaras de neumático (cámaras de aire) y protectores de neumático.
 - Un panel diario con: comprador, número y objeto del llamado, fecha de publicación,
   fecha de apertura, estado (abierta / por vencer / cerrada) y link a la fuente oficial.
 
@@ -61,7 +63,7 @@ de apertura, estado y link al pliego.
 |---|---|---|
 | Lista de municipios/organismos objetivo | Hoja *Prospectos* del Excel `Prospeccion_Clientes_Flotas.xlsx` | Ya existe |
 | Portales de compras públicas donde publican esos municipios | PBAC (Provincia de Bs. As.), SIBOM (boletines oficiales municipales), BAC (CABA), COMPR.AR / CONTRAT.AR (Nación), y el sitio propio de cada municipio | A relevar por municipio |
-| Palabras clave del rubro | neumático(s), cubierta(s), cámara(s), llanta(s), recapado, recauchutaje, gomería, alineación, balanceo | Definido (ajustable) |
+| Palabras clave del rubro | **Principal:** neumático(s), cubierta(s), llanta(s), recapado, recauchutaje, gomería. **Secundario:** cámara de aire, batería de auto/camión, protector de neumático. Cada palabra ruidosa ("cámara", "batería", "protector") lleva su propio filtro de falsos positivos. | Definido (ajustable) |
 | CUIT / datos de la empresa para registrarse como proveedor en cada portal | Interno | Pendiente de confirmar con la empresa |
 | Cada cuánto publica cada municipio y con qué anticipación | Se aprende observando el radar unas semanas | Pendiente |
 

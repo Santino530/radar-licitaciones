@@ -57,6 +57,10 @@ KEYWORDS = [
     "recauchutaje",
     "gomeria",
     "camaras y llantas",
+    "camara de aire",           # camaras de neumatico (evita "camara" a secas = video/frio/septica)
+    "protector de neumaticos",  # faja de proteccion entre camara y cubierta
+    "bateria",                  # baterias de auto / camion
+    "baterias",
 ]
 
 # --- Filtro de ruido -------------------------------------------------------
@@ -73,12 +77,47 @@ RUIDO_PATRONES = [
     "playon deportivo", "playón deportivo", "cubierta de playon",       # "cubierta" = techo, no neumatico
     "cubierta del playon", "cubierta metalica", "cubierta metálica",
     "cubierta de chapa", "cubierta del natatorio", "cubierta del polideportivo",
+    "cubierta del gimnasio",
+    # "camara" que NO es de neumatico
+    "camara de video", "camaras de video", "camara de seguridad",
+    "camaras de seguridad", "camara de vigilancia", "camaras de vigilancia",
+    "videovigilancia", "video vigilancia", "video-vigilancia",
+    "monitoreo urbano", "centro de monitoreo", "camara domo", "domo ptz",
+    "camara ip", "camara termografica", "camara septica", "camara de inspeccion",
+    "camara subterranea", "camara frigorifica", "camara de frio", "camara gesell",
+    "camara legislativa", "camara de diputados", "camara de senadores",
+    "camara de comercio", "camara de apelaciones", "camara de bombeo",
+    "camara de valvulas", "camara transformadora", "camara reductora",
+    "camara de aire acondicionado",
+    # "protector" que NO es de neumatico (mayormente EPP / salud)
+    "protector facial", "protector ocular", "protector bucal", "protector auditivo",
+    "protector solar", "protector labial", "protector de colchon",
+    "protector de pantalla", "protector gastrico", "protector plomado",
+    "protector radiologico", "protector dental", "protector de calzado",
+    "protector mamario", "protector genital",
+    # "bateria" que NO es de vehiculo
+    "bateria de cocina", "bateria sanitaria", "bateria de bano", "bateria de pozo",
+    "bateria de pozos", "bateria para ups", "bateria de ups", "bateria de emergencia",
+    "bateria solar", "banco de baterias", "bateria de reloj", "bateria de notebook",
+    "bateria de tests", "bateria de pruebas", "bateria psicologica",
+    "termotanque", "tanque acumulador",
 ]
 
 
+def _norm(s):
+    s = (s or "").lower()
+    for a, b in (("á", "a"), ("é", "e"), ("í", "i"), ("ó", "o"), ("ú", "u"),
+                 ("ü", "u"), ("ñ", "n")):
+        s = s.replace(a, b)
+    return s
+
+
+RUIDO_NORM = [_norm(p) for p in RUIDO_PATRONES]
+
+
 def es_ruido(texto):
-    t = texto.lower()
-    return any(p in t for p in RUIDO_PATRONES)
+    t = _norm(texto)
+    return any(p in t for p in RUIDO_NORM)
 
 
 # --- Estado del llamado -----------------------------------------------------

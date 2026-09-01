@@ -105,7 +105,13 @@ de apertura, estado y link al pliego.
 - **Lenguaje:** a definir al escribir el MVP (Python es lo que ya se usó en
   `busqueda-clientes-potenciales`).
 
-## 9. Estado actual (2026-08-28)
+## 9. Estado actual (2026-09-01)
+
+**El motor ya corre solo en GitHub Actions.** Repo privado:
+`https://github.com/Santino530/radar-licitaciones`. El workflow corrió OK (corrida
+manual del 2026-09-01) y commiteó `data/radar_sin_verificar.csv` como `radar-bot`.
+Cron: 12/16/21 UTC = 09/13/18 hs ART.
+
 
 - **Fuentes relevadas:** `docs/fuentes-y-adquisicion.md`, `docs/inventario-fuentes-completo.md`,
   `data/fuentes_objetivo.csv`.
@@ -123,7 +129,7 @@ de apertura, estado y link al pliego.
   `data/radar_sin_verificar.csv` y marca lo **nuevo respecto de la corrida anterior**
   (`primera_vez_visto` = "nueva apertura").
 - **Automatización:** `.github/workflows/radar.yml` — corre `radar.py` 3 veces por día
-  (09/13/18 hs ART) y commitea el CSV. **Se activa cuando el repo se suba a GitHub.**
+  y commitea el CSV. **Activo** (repo en GitHub, permisos de workflow en "write").
 - **Panel:** `scripts/build_dashboard.py` arma `web/dashboard.html` desde los CSV. Se
   publica como Artifact privado (link en `web/dashboard_url.txt`) para compartir con
   quien tenga que verlo. Tocando el nombre del comprador se despliega el detalle
@@ -131,19 +137,19 @@ de apertura, estado y link al pliego.
   manual que el equipo va completando; si no hay, ofrece un botón "buscar contacto").
   Tiene tema claro/oscuro, filtro por producto y marca de "nueva" (≤7 días). Falta: que
   se actualice solo con los datos de GitHub, y los botones de ✓/✗ para triar.
-- **Falta:** conectores Nación / Boletín provincial / portales municipales,
-  auto-actualización del panel + notificación push, y subir el repo a GitHub.
+- **Falta:** que el panel se actualice solo con los datos de GitHub, notificación push,
+  botones de ✓/✗, y conectores Nación / Boletín provincial / portales municipales.
 
 ## 10. Próximos pasos
 
-1. Subir el repo a un GitHub privado y probar el workflow con "Run workflow" a mano.
-2. Que el panel se actualice solo: una rutina en la nube que hace `git pull`, corre
+1. Que el panel se actualice solo: una rutina en la nube que hace `git pull`, corre
    `build_dashboard.py` y republica el Artifact con la misma URL.
-3. Portales municipales de los partidos del AMBA que no publican en SIBOM; Boletín
-   Oficial PBA como respaldo legal.
-4. Retomar `comprar` (Nación): postergado el 2026-08-31 — el portal resiste el
+2. Notificación push con lo nuevo de cada corrida.
+3. Botones ✓/✗ en el panel para triar desde la página (capacidad `artifact`).
+4. Portales municipales de los partidos del AMBA que no publican en SIBOM (ver
+   `docs/portales-municipales.md`); Boletín Oficial PBA como respaldo legal.
+5. Retomar `comprar` (Nación): postergado el 2026-08-31 — el portal resiste el
    postback y los datos abiertos se actualizan cada 6 meses (ver `docs/decisiones.md`).
-5. Botones ✓/✗ en el panel para triar desde la página (capacidad `artifact`).
 6. Afinar filtros de ruido y palabras clave con lo que vaya juntando el radar.
 7. Confirmar con la empresa con qué CUIT / sector (San Justo Neumáticos S.R.L. o Centro
    Integral de Neumáticos) se presenta a licitaciones.

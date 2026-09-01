@@ -292,20 +292,26 @@ def construir_metricas(hist):
     if otros:
         por_comprador.append({"label": f"otros ({len(comp) - 12})", "n": otros})
 
-    meses = Counter()
+    def _pub(h):
+        """(anio, mes) de la fecha del boletin; respaldo: primera_vez_visto."""
+        m = re.match(r"(\d{2})/(\d{2})/(\d{4})", h.get("fecha_publicacion") or "")
+        if m:
+            return int(m.group(3)), int(m.group(2))
+        m = re.match(r"(\d{4})-(\d{2})", h.get("primera_vez_visto") or "")
+        if m:
+            return int(m.group(1)), int(m.group(2))
+        return None, None
+
+    anios, meses_est = Counter(), Counter()
     for h in reales:
-        lab = _mes_label(h.get("primera_vez_visto") or h.get("fecha_publicacion") or "")
-        if lab:
-            meses[lab] += 1
-    # ordenar cronologico por la fecha real, no alfabetico
-    def _key_mes(lab):
-        try:
-            nom, anio = lab.split()
-            return (anio, f"{MES_NOMBRE.index(nom):02d}")
-        except ValueError:
-            return ("9999", "99")
-    por_mes = [{"label": k, "n": meses[k]}
-               for k in sorted(meses, key=_key_mes)][-12:]
+        a, mm = _pub(h)
+        if a:
+            anios[a] += 1
+        if mm:
+            meses_est[mm] += 1
+    por_anio = [{"label": str(a), "n": anios[a]} for a in sorted(anios)]
+    por_mes = [{"label": MES_NOMBRE[mm], "n": meses_est.get(mm, 0)}
+               for mm in range(1, 13)]
 
     prod = Counter()
     for h in reales:
@@ -322,6 +328,7 @@ def construir_metricas(hist):
                            if (h.get("es_ruido") or "").strip().lower() == "si"),
         "desde": min((h.get("primera_vez_visto", "") for h in hist), default=""),
         "por_comprador": por_comprador,
+        "por_anio": por_anio,
         "por_mes": por_mes,
         "por_producto": por_producto,
     }
@@ -1099,11 +1106,14 @@ PLANTILLA = r"""<title>Licitaciones de Neumáticos</title>
       "</div>" +
       '<div><p class="chart__t">Compradores con más licitaciones</p>' +
         barChart(MET.por_comprador, "acumulado histórico, sin contar el ruido") + "</div>" +
-      '<div><p class="chart__t">Detecciones por mes</p>' +
-        barChart(MET.por_mes, "cuándo aparecieron (por fecha de detección)") + "</div>" +
+      '<div><p class="chart__t">Licitaciones por año</p>' +
+        barChart(MET.por_anio, "para ver si es un canal constante o si sube/baja") + "</div>" +
+      '<div><p class="chart__t">Estacionalidad — por mes del año</p>' +
+        barChart(MET.por_mes, "todos los años juntos: en qué meses suele haber más") + "</div>" +
       '<div><p class="chart__t">Por producto</p>' +
         barChart(MET.por_producto, "una licitación puede contar en más de una categoría") + "</div>" +
-      (MET.desde ? '<p class="chart__sub">Datos desde ' + esc(MET.desde) + ".</p>" : "") +
+      (MET.desde ? '<p class="chart__sub">Datos desde ' + esc(MET.desde) +
+        ". SIBOM tiene histórico; PBAC y BAC solo suman desde ahora.</p>" : "") +
       "</div>";
   }
 

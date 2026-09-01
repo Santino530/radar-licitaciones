@@ -285,12 +285,26 @@ def construir_metricas(hist):
     reales = [h for h in hist if (h.get("es_ruido") or "").strip().lower() != "si"]
     estados = [(h.get("estado") or "").strip().lower() for h in reales]
 
-    comp = Counter(h.get("comprador", "").strip() or "—" for h in reales)
-    top = comp.most_common(12)
-    otros = sum(n for _, n in comp.most_common()[12:])
-    por_comprador = [{"label": c, "n": n} for c, n in top]
+    ZONA_ORD = {"objetivo": 0, "volumen_alto": 1, "": 2, "fuera": 2}
+    zc = Counter((h.get("categoria_zona") or "fuera").strip() or "fuera" for h in reales)
+    por_zona = [
+        {"key": "objetivo", "label": "Zona objetivo (AMBA + La Plata)", "n": zc.get("objetivo", 0)},
+        {"key": "volumen_alto", "label": "Volumen alto (interior)", "n": zc.get("volumen_alto", 0)},
+        {"key": "fuera", "label": "Fuera de zona", "n": zc.get("fuera", 0) + zc.get("", 0)},
+    ]
+
+    # comprador -> (count, zona mas frecuente)
+    cc = Counter()
+    czona = {}
+    for h in reales:
+        c = h.get("comprador", "").strip() or "—"
+        cc[c] += 1
+        czona.setdefault(c, (h.get("categoria_zona") or "fuera").strip() or "fuera")
+    top = cc.most_common(12)
+    otros = sum(n for _, n in cc.most_common()[12:])
+    por_comprador = [{"label": c, "n": n, "zona": czona.get(c, "fuera")} for c, n in top]
     if otros:
-        por_comprador.append({"label": f"otros ({len(comp) - 12})", "n": otros})
+        por_comprador.append({"label": f"otros ({len(cc) - 12})", "n": otros, "zona": ""})
 
     def _pub(h):
         """(anio, mes) de la fecha del boletin; respaldo: primera_vez_visto."""
@@ -322,11 +336,12 @@ def construir_metricas(hist):
 
     return {
         "total": len(reales),
-        "municipios": len(comp),
+        "municipios": len(cc),
         "adjudicadas": sum(1 for e in estados if e == "adjudicada"),
         "descartadas": sum(1 for h in hist
                            if (h.get("es_ruido") or "").strip().lower() == "si"),
         "desde": min((h.get("primera_vez_visto", "") for h in hist), default=""),
+        "por_zona": por_zona,
         "por_comprador": por_comprador,
         "por_anio": por_anio,
         "por_mes": por_mes,
@@ -746,7 +761,28 @@ PLANTILLA = r"""<title>Licitaciones de Neumáticos</title>
   }
 
   /* --- pestaña Métricas --- */
-  .met { display: flex; flex-direction: column; gap: 30px; }
+  /* paleta de graficos (metodo dataviz, validada). Definida por rol; los valores
+     dark se redefinen en los 3 scopes de tema como el resto del panel. */
+  .met {
+    --c1: #2a78d6; --c2: #eb6834; --c3: #1baf7a; --c4: #eda100; --c5: #e87ba4;
+    --c-otros: #7c7c78;
+    display: flex; flex-direction: column; gap: 30px;
+  }
+  :root:not([data-theme="light"]) .met {
+    --c1: #3987e5; --c2: #d95926; --c3: #199e70; --c4: #c98500; --c5: #d55181;
+    --c-otros: #8f8f8a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) .met {
+      --c1: #3987e5; --c2: #d95926; --c3: #199e70; --c4: #c98500; --c5: #d55181;
+      --c-otros: #8f8f8a;
+    }
+  }
+  :root[data-theme="dark"] .met {
+    --c1: #3987e5; --c2: #d95926; --c3: #199e70; --c4: #c98500; --c5: #d55181;
+    --c-otros: #8f8f8a;
+  }
+
   .met__stats {
     display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px;
   }
@@ -757,6 +793,7 @@ PLANTILLA = r"""<title>Licitaciones de Neumáticos</title>
   .met__stat b {
     font-family: "IBM Plex Mono", monospace; font-weight: 500; font-size: 1.6rem;
     display: block; line-height: 1; margin-bottom: 4px; font-variant-numeric: tabular-nums;
+    color: var(--c1);
   }
   .met__stat span {
     font-family: "Libre Franklin", sans-serif; font-weight: 600; font-size: 11px;
@@ -767,9 +804,11 @@ PLANTILLA = r"""<title>Licitaciones de Neumáticos</title>
     margin: 0 0 3px;
   }
   .chart__sub { font-size: 12px; color: var(--ink-soft); margin: 0 0 14px; }
+  .chart__hi { color: var(--ink); font-weight: 600; }
+
   .barh { display: flex; flex-direction: column; gap: 5px; }
   .barh__row {
-    display: grid; grid-template-columns: 148px 1fr auto; gap: 10px; align-items: center;
+    display: grid; grid-template-columns: 150px 1fr auto; gap: 10px; align-items: center;
     font-size: 12.5px;
   }
   .barh__lbl {
@@ -778,13 +817,31 @@ PLANTILLA = r"""<title>Licitaciones de Neumáticos</title>
   }
   .barh__track { background: var(--surface-2); border-radius: 3px; height: 16px; }
   .barh__fill {
-    height: 16px; min-width: 2px; background: var(--accent);
+    height: 16px; min-width: 3px; background: var(--c1);
     border-radius: 3px; transition: filter 120ms ease;
   }
-  .barh__row:hover .barh__fill { filter: brightness(1.12); }
+  .barh__row:hover .barh__fill { filter: brightness(1.1); }
   .barh__val {
     font-family: "IBM Plex Mono", monospace; color: var(--ink);
     font-variant-numeric: tabular-nums; min-width: 2ch; text-align: right;
+  }
+
+  /* donut de reparto por zona */
+  .donut { display: flex; flex-wrap: wrap; gap: 18px 26px; align-items: center; }
+  .donut__ring {
+    width: 132px; height: 132px; border-radius: 50%; flex: 0 0 auto;
+    -webkit-mask: radial-gradient(circle, transparent 40%, #000 41%);
+            mask: radial-gradient(circle, transparent 40%, #000 41%);
+  }
+  .donut__leg { display: flex; flex-direction: column; gap: 7px; font-size: 12.5px; }
+  .donut__row { display: flex; align-items: baseline; gap: 8px; }
+  .donut__sw {
+    width: 11px; height: 11px; border-radius: 3px; flex: 0 0 auto;
+    transform: translateY(1px);
+  }
+  .donut__n {
+    font-family: "IBM Plex Mono", monospace; color: var(--ink);
+    font-variant-numeric: tabular-nums; margin-left: auto;
   }
   @media (max-width: 560px) {
     .barh__row { grid-template-columns: 96px 1fr auto; }
@@ -1075,18 +1132,50 @@ PLANTILLA = r"""<title>Licitaciones de Neumáticos</title>
       "recapado asfáltico de calzada, etc.). A la vista para poder auditarlos."
   };
 
-  function barChart(datos, subtitulo) {
+  var ZONA_COLOR = { objetivo: "var(--c1)", volumen_alto: "var(--c2)", fuera: "var(--c3)", "": "var(--c-otros)" };
+  var PROD_COLOR = { "Neumáticos": "var(--c1)", "Llantas": "var(--c2)", "Cámaras": "var(--c3)",
+                     "Baterías": "var(--c4)", "Protectores": "var(--c5)", "Otros": "var(--c-otros)" };
+
+  // datos: [{label, n, color?, mix?}]. color = fill fijo; mix (0..1) = mezcla c1 con la
+  // superficie por intensidad (sirve para estacionalidad).
+  function barChart(datos, subtitulo, opt) {
+    opt = opt || {};
     if (!datos.length) return '<p class="chart__sub">Todavía sin datos.</p>';
     var max = datos.reduce(function (m, d) { return Math.max(m, d.n); }, 1);
     var rows = datos.map(function (d) {
       var pct = Math.round(d.n / max * 100);
+      var fill = d.color || opt.color || "var(--c1)";
+      if (d.mix != null) {
+        var p = Math.round(30 + 70 * d.mix);
+        fill = "color-mix(in oklab, var(--c1) " + p + "%, var(--surface-2))";
+      }
       return '<div class="barh__row" title="' + esc(d.label + ": " + d.n) + '">' +
         '<span class="barh__lbl">' + esc(d.label) + "</span>" +
-        '<span class="barh__track"><span class="barh__fill" style="width:' + pct + '%"></span></span>' +
+        '<span class="barh__track"><span class="barh__fill" style="width:' + pct +
+          "%;background:" + fill + '"></span></span>' +
         '<span class="barh__val">' + d.n + "</span></div>";
     }).join("");
-    return (subtitulo ? '<p class="chart__sub">' + esc(subtitulo) + "</p>" : "") +
+    return (subtitulo ? '<p class="chart__sub">' + subtitulo + "</p>" : "") +
       '<div class="barh">' + rows + "</div>";
+  }
+
+  function donut(zonas) {
+    var tot = zonas.reduce(function (s, z) { return s + z.n; }, 0) || 1;
+    var acc = 0, stops = [];
+    zonas.forEach(function (z) {
+      var a = acc / tot * 100, b = (acc + z.n) / tot * 100;
+      stops.push(ZONA_COLOR[z.key] + " " + a.toFixed(1) + "% " + b.toFixed(1) + "%");
+      acc += z.n;
+    });
+    var leg = zonas.map(function (z) {
+      var pct = Math.round(z.n / tot * 100);
+      return '<div class="donut__row"><span class="donut__sw" style="background:' +
+        ZONA_COLOR[z.key] + '"></span><span>' + esc(z.label) + "</span>" +
+        '<span class="donut__n">' + z.n + " · " + pct + "%</span></div>";
+    }).join("");
+    return '<div class="donut"><div class="donut__ring" role="img" aria-label="reparto por zona" ' +
+      'style="background:conic-gradient(' + stops.join(",") + ')"></div>' +
+      '<div class="donut__leg">' + leg + "</div></div>";
   }
 
   function renderMetricas() {
@@ -1097,6 +1186,19 @@ PLANTILLA = r"""<title>Licitaciones de Neumáticos</title>
     var stat = function (n, l) {
       return '<div class="met__stat"><b>' + n + "</b><span>" + esc(l) + "</span></div>";
     };
+    var comp = MET.por_comprador.map(function (d) {
+      return { label: d.label, n: d.n, color: ZONA_COLOR[d.zona] || "var(--c-otros)" };
+    });
+    var prod = MET.por_producto.map(function (d) {
+      return { label: d.label, n: d.n, color: PROD_COLOR[d.label] || "var(--c-otros)" };
+    });
+    var maxMes = MET.por_mes.reduce(function (m, d) { return Math.max(m, d.n); }, 1);
+    var mes = MET.por_mes.map(function (d) {
+      return { label: d.label, n: d.n, mix: d.n / maxMes };
+    });
+    var pico = MET.por_mes.slice().sort(function (a, b) { return b.n - a.n; })
+      .filter(function (d) { return d.n > 0; }).slice(0, 3).map(function (d) { return d.label; });
+
     return '<div class="met">' +
       '<div class="met__stats">' +
         stat(MET.total, "licitaciones detectadas") +
@@ -1104,16 +1206,29 @@ PLANTILLA = r"""<title>Licitaciones de Neumáticos</title>
         stat(MET.adjudicadas, "adjudicadas registradas") +
         stat(MET.descartadas, "descartadas por el filtro") +
       "</div>" +
+
+      '<div><p class="chart__t">¿Cuánto del radar es zona operable?</p>' +
+        '<p class="chart__sub">Reparto de todo lo detectado. <span style="color:var(--c1)">■</span> ' +
+        'zona objetivo = donde la empresa puede prestar servicio.</p>' +
+        donut(MET.por_zona) + "</div>" +
+
       '<div><p class="chart__t">Compradores con más licitaciones</p>' +
-        barChart(MET.por_comprador, "acumulado histórico, sin contar el ruido") + "</div>" +
+        barChart(comp, 'coloreado por zona (mismo código que el donut de arriba)') + "</div>" +
+
       '<div><p class="chart__t">Licitaciones por año</p>' +
-        barChart(MET.por_anio, "para ver si es un canal constante o si sube/baja") + "</div>" +
-      '<div><p class="chart__t">Estacionalidad — por mes del año</p>' +
-        barChart(MET.por_mes, "todos los años juntos: en qué meses suele haber más") + "</div>" +
+        barChart(MET.por_anio, "¿es un canal constante o sube/baja? " +
+          "(Provincia y CABA solo suman desde 2026)") + "</div>" +
+
+      '<div><p class="chart__t">Estacionalidad — en qué meses hay más</p>' +
+        barChart(mes, "todos los años juntos. Barra más intensa = más movimiento. " +
+          (pico.length ? 'Pico: <span class="chart__hi">' + esc(pico.join(", ")) + "</span>." : "")) +
+        "</div>" +
+
       '<div><p class="chart__t">Por producto</p>' +
-        barChart(MET.por_producto, "una licitación puede contar en más de una categoría") + "</div>" +
+        barChart(prod, "una licitación puede contar en más de una categoría") + "</div>" +
+
       (MET.desde ? '<p class="chart__sub">Datos desde ' + esc(MET.desde) +
-        ". SIBOM tiene histórico; PBAC y BAC solo suman desde ahora.</p>" : "") +
+        ". SIBOM aporta histórico largo; PBAC (Provincia) y BAC (CABA) solo suman desde ahora.</p>" : "") +
       "</div>";
   }
 

@@ -799,17 +799,55 @@ PLANTILLA = r"""<title>Licitaciones de Neumáticos</title>
     font-family: "Libre Franklin", sans-serif; font-weight: 600; font-size: 11px;
     letter-spacing: .03em; text-transform: uppercase; color: var(--ink-soft);
   }
+  .met__stat { position: relative; }
+  .met__spark { position: absolute; right: 12px; bottom: 10px; width: 96px; opacity: .8; }
+  .spark { width: 100%; height: 22px; display: block; }
+  .chart {
+    background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
+    padding: 16px 16px 18px;
+  }
   .chart__t {
     font-family: "Libre Franklin", sans-serif; font-weight: 700; font-size: 1rem;
     margin: 0 0 3px;
   }
-  .chart__sub { font-size: 12px; color: var(--ink-soft); margin: 0 0 14px; }
+  .chart__sub { font-size: 12px; color: var(--ink-soft); margin: 0 0 12px; }
   .chart__hi { color: var(--ink); font-weight: 600; }
+
+  /* SVG charts (area / columnas) */
+  .svgc { width: 100%; }
+  .svgc svg { width: 100%; height: auto; display: block; overflow: visible; }
+  .svgc__grid { stroke: var(--line); stroke-width: 1; }
+  .svgc__ax { fill: var(--ink-soft); font-family: "IBM Plex Mono", monospace; font-size: 10px; }
+  .svgc__lbl { fill: var(--ink); font-family: "IBM Plex Mono", monospace; font-size: 11px; font-weight: 500; }
+  .svgc__pt { fill: var(--c1); }
+  .svgc__pt.is-big { stroke: var(--surface); stroke-width: 2; }
+  .svgc svg:hover .svgc__pt { r: 3.5; }
+
+  /* barra de composicion 100% apilada */
+  .stack {
+    display: flex; height: 26px; border-radius: 5px; overflow: hidden;
+    background: var(--surface-2); gap: 2px;
+  }
+  .stack__seg {
+    display: flex; align-items: center; justify-content: center; min-width: 2px;
+    font-family: "IBM Plex Mono", monospace; font-size: 10.5px; color: #fff;
+    font-weight: 500; white-space: nowrap;
+  }
+  .stack__leg {
+    display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 10px; font-size: 12px;
+    color: var(--ink-soft);
+  }
+  .stack__lg { display: inline-flex; align-items: center; gap: 5px; }
+  .stack__sw { width: 10px; height: 10px; border-radius: 3px; }
 
   .barh { display: flex; flex-direction: column; gap: 5px; }
   .barh__row {
     display: grid; grid-template-columns: 150px 1fr auto; gap: 10px; align-items: center;
     font-size: 12.5px;
+  }
+  .barh__dot {
+    display: inline-block; width: 8px; height: 8px; border-radius: 2px;
+    margin-right: 6px; vertical-align: middle;
   }
   .barh__lbl {
     color: var(--ink-soft); text-align: right; overflow: hidden;
@@ -1136,27 +1174,112 @@ PLANTILLA = r"""<title>Licitaciones de Neumáticos</title>
   var PROD_COLOR = { "Neumáticos": "var(--c1)", "Llantas": "var(--c2)", "Cámaras": "var(--c3)",
                      "Baterías": "var(--c4)", "Protectores": "var(--c5)", "Otros": "var(--c-otros)" };
 
-  // datos: [{label, n, color?, mix?}]. color = fill fijo; mix (0..1) = mezcla c1 con la
-  // superficie por intensidad (sirve para estacionalidad).
-  function barChart(datos, subtitulo, opt) {
-    opt = opt || {};
+  // datos: [{label, n, color?, dot?}]. barras horizontales rankeadas.
+  function barChart(datos, subtitulo) {
     if (!datos.length) return '<p class="chart__sub">Todavía sin datos.</p>';
     var max = datos.reduce(function (m, d) { return Math.max(m, d.n); }, 1);
     var rows = datos.map(function (d) {
       var pct = Math.round(d.n / max * 100);
-      var fill = d.color || opt.color || "var(--c1)";
-      if (d.mix != null) {
-        var p = Math.round(30 + 70 * d.mix);
-        fill = "color-mix(in oklab, var(--c1) " + p + "%, var(--surface-2))";
-      }
+      var dot = d.dot ? '<span class="barh__dot" style="background:' + d.dot + '"></span>' : "";
       return '<div class="barh__row" title="' + esc(d.label + ": " + d.n) + '">' +
-        '<span class="barh__lbl">' + esc(d.label) + "</span>" +
+        '<span class="barh__lbl">' + dot + esc(d.label) + "</span>" +
         '<span class="barh__track"><span class="barh__fill" style="width:' + pct +
-          "%;background:" + fill + '"></span></span>' +
+          "%;background:" + (d.color || "var(--c1)") + '"></span></span>' +
         '<span class="barh__val">' + d.n + "</span></div>";
     }).join("");
     return (subtitulo ? '<p class="chart__sub">' + subtitulo + "</p>" : "") +
       '<div class="barh">' + rows + "</div>";
+  }
+
+  // area/linea para series temporales (por año)
+  function areaChart(pts) {
+    if (pts.length < 2) return barChart(pts.map(function (p) {
+      return { label: p.label, n: p.n }; }), "");
+    var W = 620, H = 172, L = 30, R = 10, T = 12, B = 26;
+    var iw = W - L - R, ih = H - T - B;
+    var max = pts.reduce(function (m, p) { return Math.max(m, p.n); }, 1);
+    var nice = Math.ceil(max / 4) * 4 || 4;
+    var X = function (i) { return L + i / (pts.length - 1) * iw; };
+    var Y = function (v) { return T + ih - v / nice * ih; };
+    var linePts = pts.map(function (p, i) { return X(i).toFixed(1) + "," + Y(p.n).toFixed(1); });
+    var area = "M" + X(0).toFixed(1) + "," + (T + ih) + " L" + linePts.join(" L") +
+               " L" + X(pts.length - 1).toFixed(1) + "," + (T + ih) + " Z";
+    var maxIdx = pts.reduce(function (mi, p, i) { return p.n > pts[mi].n ? i : mi; }, 0);
+    var grid = [0, nice / 2, nice].map(function (v) {
+      return '<line x1="' + L + '" x2="' + (W - R) + '" y1="' + Y(v).toFixed(1) +
+        '" y2="' + Y(v).toFixed(1) + '" class="svgc__grid"/>' +
+        '<text x="' + (L - 5) + '" y="' + (Y(v) + 3).toFixed(1) +
+        '" class="svgc__ax" text-anchor="end">' + v + "</text>";
+    }).join("");
+    var dots = pts.map(function (p, i) {
+      var big = (i === pts.length - 1 || i === maxIdx);
+      return '<circle cx="' + X(i).toFixed(1) + '" cy="' + Y(p.n).toFixed(1) + '" r="' +
+        (big ? 4 : 2.5) + '" class="svgc__pt' + (big ? " is-big" : "") + '">' +
+        "<title>" + esc(p.label + ": " + p.n) + "</title></circle>" +
+        (big ? '<text x="' + X(i).toFixed(1) + '" y="' + (Y(p.n) - 8).toFixed(1) +
+          '" class="svgc__lbl" text-anchor="middle">' + p.n + "</text>" : "");
+    }).join("");
+    var xlab = pts.map(function (p, i) {
+      return '<text x="' + X(i).toFixed(1) + '" y="' + (H - 8) +
+        '" class="svgc__ax" text-anchor="middle">' + esc(p.label) + "</text>";
+    }).join("");
+    return '<div class="svgc"><svg viewBox="0 0 ' + W + " " + H +
+      '" role="img" aria-label="licitaciones por año">' +
+      '<defs><linearGradient id="ga" x1="0" x2="0" y1="0" y2="1">' +
+      '<stop offset="0" stop-color="var(--c1)" stop-opacity="0.28"/>' +
+      '<stop offset="1" stop-color="var(--c1)" stop-opacity="0.02"/></linearGradient></defs>' +
+      grid + '<path d="' + area + '" fill="url(#ga)"/>' +
+      '<polyline points="' + linePts.join(" ") + '" fill="none" stroke="var(--c1)" stroke-width="2"/>' +
+      dots + xlab + "</svg></div>";
+  }
+
+  // columnas verticales para estacionalidad (ene..dic)
+  function columnas(data) {
+    var W = 620, H = 150, L = 8, R = 8, T = 16, B = 20;
+    var iw = W - L - R, ih = H - T - B, slot = iw / data.length, bw = slot * 0.6;
+    var max = data.reduce(function (m, d) { return Math.max(m, d.n); }, 1);
+    var maxIdx = data.reduce(function (mi, d, i) { return d.n > data[mi].n ? i : mi; }, 0);
+    var bars = data.map(function (d, i) {
+      var h = d.n / max * ih, x = L + i * slot + (slot - bw) / 2, y = T + ih - h;
+      var p = Math.round(28 + 72 * (d.n / max));
+      var fill = "color-mix(in oklab, var(--c1) " + p + "%, var(--surface-2))";
+      return '<rect x="' + x.toFixed(1) + '" y="' + y.toFixed(1) + '" width="' + bw.toFixed(1) +
+        '" height="' + Math.max(h, 1).toFixed(1) + '" rx="2" fill="' + fill + '">' +
+        "<title>" + esc(d.label + ": " + d.n) + "</title></rect>" +
+        (i === maxIdx && d.n > 0 ? '<text x="' + (x + bw / 2).toFixed(1) + '" y="' +
+          (y - 4).toFixed(1) + '" class="svgc__lbl" text-anchor="middle">' + d.n + "</text>" : "") +
+        '<text x="' + (x + bw / 2).toFixed(1) + '" y="' + (H - 6) +
+        '" class="svgc__ax" text-anchor="middle">' + esc(d.label) + "</text>";
+    }).join("");
+    return '<div class="svgc"><svg viewBox="0 0 ' + W + " " + H +
+      '" role="img" aria-label="estacionalidad por mes">' + bars + "</svg></div>";
+  }
+
+  // barra unica 100% apilada para composicion (por producto)
+  function stackBar(data) {
+    var tot = data.reduce(function (s, d) { return s + d.n; }, 0) || 1;
+    var segs = data.map(function (d) {
+      var w = d.n / tot * 100;
+      return '<span class="stack__seg" style="width:' + w.toFixed(2) + "%;background:" +
+        d.color + '" title="' + esc(d.label + ": " + d.n + " (" + Math.round(w) + "%)") + '">' +
+        (w >= 11 ? Math.round(w) + "%" : "") + "</span>";
+    }).join("");
+    var leg = data.map(function (d) {
+      return '<span class="stack__lg"><span class="stack__sw" style="background:' + d.color +
+        '"></span>' + esc(d.label) + " · " + d.n + "</span>";
+    }).join("");
+    return '<div class="stack">' + segs + '</div><div class="stack__leg">' + leg + "</div>";
+  }
+
+  function spark(vals) {
+    if (vals.length < 2) return "";
+    var W = 96, H = 22, max = Math.max.apply(null, vals) || 1;
+    var pts = vals.map(function (v, i) {
+      return (i / (vals.length - 1) * W).toFixed(1) + "," + (H - v / max * (H - 3) - 1).toFixed(1);
+    }).join(" ");
+    return '<svg class="spark" viewBox="0 0 ' + W + " " + H +
+      '" preserveAspectRatio="none" aria-hidden="true"><polyline points="' + pts +
+      '" fill="none" stroke="var(--c1)" stroke-width="1.6"/></svg>';
   }
 
   function donut(zonas) {
@@ -1183,49 +1306,52 @@ PLANTILLA = r"""<title>Licitaciones de Neumáticos</title>
       return '<div class="empty">La sección de métricas se llena a medida que el radar ' +
         "acumula corridas. Todavía hay muy pocos datos.</div>";
     }
-    var stat = function (n, l) {
-      return '<div class="met__stat"><b>' + n + "</b><span>" + esc(l) + "</span></div>";
+    var stat = function (n, l, extra) {
+      return '<div class="met__stat"><b>' + n + "</b><span>" + esc(l) + "</span>" +
+        (extra || "") + "</div>";
     };
     var comp = MET.por_comprador.map(function (d) {
-      return { label: d.label, n: d.n, color: ZONA_COLOR[d.zona] || "var(--c-otros)" };
+      return { label: d.label, n: d.n, color: "var(--c1)",
+               dot: d.zona ? (ZONA_COLOR[d.zona] || "var(--c-otros)") : "" };
     });
+    var top3 = MET.por_comprador.slice(0, 3).reduce(function (s, d) { return s + d.n; }, 0);
+    var top3pct = Math.round(top3 / (MET.total || 1) * 100);
     var prod = MET.por_producto.map(function (d) {
       return { label: d.label, n: d.n, color: PROD_COLOR[d.label] || "var(--c-otros)" };
     });
-    var maxMes = MET.por_mes.reduce(function (m, d) { return Math.max(m, d.n); }, 1);
-    var mes = MET.por_mes.map(function (d) {
-      return { label: d.label, n: d.n, mix: d.n / maxMes };
-    });
     var pico = MET.por_mes.slice().sort(function (a, b) { return b.n - a.n; })
       .filter(function (d) { return d.n > 0; }).slice(0, 3).map(function (d) { return d.label; });
+    var sparkVals = MET.por_anio.map(function (d) { return d.n; });
 
     return '<div class="met">' +
       '<div class="met__stats">' +
-        stat(MET.total, "licitaciones detectadas") +
+        stat(MET.total, "licitaciones detectadas", '<span class="met__spark">' + spark(sparkVals) + "</span>") +
         stat(MET.municipios, "compradores distintos") +
         stat(MET.adjudicadas, "adjudicadas registradas") +
         stat(MET.descartadas, "descartadas por el filtro") +
       "</div>" +
 
-      '<div><p class="chart__t">¿Cuánto del radar es zona operable?</p>' +
-        '<p class="chart__sub">Reparto de todo lo detectado. <span style="color:var(--c1)">■</span> ' +
-        'zona objetivo = donde la empresa puede prestar servicio.</p>' +
+      '<div class="chart"><p class="chart__t">¿Cuánto del radar es zona operable?</p>' +
+        '<p class="chart__sub">Reparto de todo lo detectado. Zona objetivo = donde la ' +
+        'empresa puede prestar servicio.</p>' +
         donut(MET.por_zona) + "</div>" +
 
-      '<div><p class="chart__t">Compradores con más licitaciones</p>' +
-        barChart(comp, 'coloreado por zona (mismo código que el donut de arriba)') + "</div>" +
+      '<div class="chart"><p class="chart__t">Compradores con más licitaciones</p>' +
+        barChart(comp, 'El punto de color indica la zona (mismo código que el donut). ' +
+          'Los 3 primeros concentran el <span class="chart__hi">' + top3pct + "%</span>.") + "</div>" +
 
-      '<div><p class="chart__t">Licitaciones por año</p>' +
-        barChart(MET.por_anio, "¿es un canal constante o sube/baja? " +
-          "(Provincia y CABA solo suman desde 2026)") + "</div>" +
+      '<div class="chart"><p class="chart__t">Licitaciones por año</p>' +
+        '<p class="chart__sub">¿Es un canal constante o sube/baja? Provincia y CABA recién ' +
+        'suman desde 2026.</p>' + areaChart(MET.por_anio) + "</div>" +
 
-      '<div><p class="chart__t">Estacionalidad — en qué meses hay más</p>' +
-        barChart(mes, "todos los años juntos. Barra más intensa = más movimiento. " +
-          (pico.length ? 'Pico: <span class="chart__hi">' + esc(pico.join(", ")) + "</span>." : "")) +
-        "</div>" +
+      '<div class="chart"><p class="chart__t">Estacionalidad — en qué meses hay más</p>' +
+        '<p class="chart__sub">Todos los años juntos. ' +
+        (pico.length ? 'Pico: <span class="chart__hi">' + esc(pico.join(", ")) + "</span>." : "") +
+        "</p>" + columnas(MET.por_mes) + "</div>" +
 
-      '<div><p class="chart__t">Por producto</p>' +
-        barChart(prod, "una licitación puede contar en más de una categoría") + "</div>" +
+      '<div class="chart"><p class="chart__t">Composición por producto</p>' +
+        '<p class="chart__sub">Una licitación puede contar en más de una categoría.</p>' +
+        stackBar(prod) + "</div>" +
 
       (MET.desde ? '<p class="chart__sub">Datos desde ' + esc(MET.desde) +
         ". SIBOM aporta histórico largo; PBAC (Provincia) y BAC (CABA) solo suman desde ahora.</p>" : "") +

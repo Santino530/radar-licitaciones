@@ -329,6 +329,51 @@
     margin-right: 6px; vertical-align: middle;
   }
 
+  /* --- pestaña Métricas --- */
+  .met { display: flex; flex-direction: column; gap: 30px; }
+  .met__stats {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px;
+  }
+  .met__stat {
+    background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
+    padding: 12px 14px;
+  }
+  .met__stat b {
+    font-family: "IBM Plex Mono", monospace; font-weight: 500; font-size: 1.6rem;
+    display: block; line-height: 1; margin-bottom: 4px; font-variant-numeric: tabular-nums;
+  }
+  .met__stat span {
+    font-family: "Libre Franklin", sans-serif; font-weight: 600; font-size: 11px;
+    letter-spacing: .03em; text-transform: uppercase; color: var(--ink-soft);
+  }
+  .chart__t {
+    font-family: "Libre Franklin", sans-serif; font-weight: 700; font-size: 1rem;
+    margin: 0 0 3px;
+  }
+  .chart__sub { font-size: 12px; color: var(--ink-soft); margin: 0 0 14px; }
+  .barh { display: flex; flex-direction: column; gap: 5px; }
+  .barh__row {
+    display: grid; grid-template-columns: 148px 1fr auto; gap: 10px; align-items: center;
+    font-size: 12.5px;
+  }
+  .barh__lbl {
+    color: var(--ink-soft); text-align: right; overflow: hidden;
+    text-overflow: ellipsis; white-space: nowrap;
+  }
+  .barh__track { background: var(--surface-2); border-radius: 3px; height: 16px; }
+  .barh__fill {
+    height: 16px; min-width: 2px; background: var(--accent);
+    border-radius: 3px; transition: filter 120ms ease;
+  }
+  .barh__row:hover .barh__fill { filter: brightness(1.12); }
+  .barh__val {
+    font-family: "IBM Plex Mono", monospace; color: var(--ink);
+    font-variant-numeric: tabular-nums; min-width: 2ch; text-align: right;
+  }
+  @media (max-width: 560px) {
+    .barh__row { grid-template-columns: 96px 1fr auto; }
+  }
+
   @media (prefers-reduced-motion: reduce) {
     * { transition: none !important; }
   }
@@ -358,7 +403,7 @@
 
   <section class="summary" id="summary" aria-label="Resumen"></section>
 
-  <div class="controls">
+  <div class="controls" id="controls">
     <input type="search" id="q" placeholder="Buscar comprador, objeto, palabra clave…" aria-label="Buscar">
     <select id="producto" aria-label="Filtrar por producto">
       <option value="">Todos los productos</option>
@@ -392,6 +437,7 @@
   <div class="tabs" id="tabs" role="tablist">
     <button class="tab" data-tab="vigentes" role="tab" aria-selected="true">Vigentes y por vencer<span class="tab__n" id="tabn-vigentes"></span></button>
     <button class="tab" data-tab="cerradas" role="tab" aria-selected="false">Cerradas / adjudicadas<span class="tab__n" id="tabn-cerradas"></span></button>
+    <button class="tab" data-tab="metricas" role="tab" aria-selected="false">Métricas<span class="tab__n" id="tabn-metricas"></span></button>
     <button class="tab" data-tab="ruido" role="tab" aria-selected="false">Descartadas<span class="tab__n" id="tabn-ruido"></span></button>
   </div>
 
@@ -413,13 +459,15 @@
 
 <script id="radar-data" type="application/json">[{"fuente": "sibom", "comprador": "Berazategui", "objeto": "Decreto Nº555 en el boletín 157º de Berazategui", "fragmento": "Licitacion Privada 31/2026 para el objeto \"Adquisicion de baterias para flota rodante municipal\" ...", "texto": "Licitacion Privada 31/2026 para el objeto \"Adquisicion de baterias para flota rodante municipal\" ...", "ref": "Decreto Nº555 en el boletín 157º de Berazategui", "tipo": "", "id_origen": "https://sibom.slyt.gba.gob.ar/bulletins/15450/contents/2422693", "estado": "", "grupo": "vigente", "cierre": "", "por_vencer": false, "zona": "objetivo", "keywords": ["bateria", "baterias"], "productos": ["Baterías"], "nueva": true, "url": "https://sibom.slyt.gba.gob.ar/bulletins/15450/contents/2422693", "fecha_pub_iso": "2026-07-29", "fecha_pub_label": "29/07/2026", "fecha_ap_iso": "", "fecha_ap_label": "", "dias_apertura": null, "detectada": "2026-08-31", "corrida": "2026-09-01", "contacto": {"email": "", "telefono": "011-4356-9200 int 1135", "web_compras": "https://berazategui.gob.ar/licitaciones/", "notas": "Direccion de Compras - Av. 14 e/ 131 y 131A, 2 piso. Sin email de compras (el del sitio es de planeamiento)."}}, {"fuente": "sibom", "comprador": "Mercedes", "objeto": "Decreto Nº1038/2026 en el boletín 107º de Mercedes", "fragmento": "es la adquisición de cubiertas ... […] - -MERCEDES-COMP#SEH, caratulado “Concurso de Precios N° 33/2026 – Adquisición de cubiertas ”, y; ... […] .000,00 (Pesos veinticuatro millones ochocientos noventa mil con 00/100 centavos) la compra de cubiertas , según lo especificado en el Pliego de Bases y Condiciones obrante en el EX-2026-00047451- -MERCEDES-COMP#SEH ...", "texto": "es la adquisición de cubiertas ... […] - -MERCEDES-COMP#SEH, caratulado “Concurso de Precios N° 33/2026 – Adquisición de cubiertas ”, y; ... […] .000,00 (Pesos veinticuatro millones ochocientos noventa mil con 00/100 centavos) la compra de cubiertas , según lo especificado en el Pliego de Bases y Condiciones obrante en el EX-2026-00047451- -MERCEDES-COMP#SEH ...", "ref": "Decreto Nº1038/2026 en el boletín 107º de Mercedes", "tipo": "", "id_origen": "https://sibom.slyt.gba.gob.ar/bulletins/15416/contents/2422544", "estado": "adjudicada", "grupo": "cerrada", "cierre": "", "por_vencer": false, "zona": "volumen_alto", "keywords": ["cubierta", "cubiertas"], "productos": ["Neumáticos"], "nueva": true, "url": "https://sibom.slyt.gba.gob.ar/bulletins/15416/contents/2422544", "fecha_pub_iso": "2026-07-30", "fecha_pub_label": "30/07/2026", "fecha_ap_iso": "", "fecha_ap_label": "", "dias_apertura": null, "detectada": "2026-08-28", "corrida": "2026-09-01", "contacto": {"email": "licitaciones@mercedes.gob.ar", "telefono": "2324-423021", "web_compras": "https://nw.mercedes.gob.ar/transparencia/compras/licitaciones", "notas": "Direccion de Compras - Calle 29 N 575 e/ 24 y 26. Alta de proveedores: altaproveedores@mercedes.gob.ar."}}, {"fuente": "sibom", "comprador": "Tandil", "objeto": "Decreto Nº2364/2026 en el boletín 349º de Tandil", "fragmento": ", y el ítem N°2 a la mejor oferta, Proveedor LARROCA NEUMATICOS S […] ) Proveedor LAROCCA NEUMATICOS S.A.: Ítem N° 2 por un valor de $3.769.740,00 (tres millones setecientos […] El Concurso de Precios N° 64-03-26 “ADQUISICION NEUMATICOS PARA CARGA Y TRANSPORTE", "texto": ", y el ítem N°2 a la mejor oferta, Proveedor LARROCA NEUMATICOS S […] ) Proveedor LAROCCA NEUMATICOS S.A.: Ítem N° 2 por un valor de $3.769.740,00 (tres millones setecientos […] El Concurso de Precios N° 64-03-26 “ADQUISICION NEUMATICOS PARA CARGA Y TRANSPORTE", "ref": "Decreto Nº2364/2026 en el boletín 349º de Tandil", "tipo": "", "id_origen": "https://sibom.slyt.gba.gob.ar/bulletins/15468/contents/2423123", "estado": "adjudicada", "grupo": "cerrada", "cierre": "", "por_vencer": false, "zona": "volumen_alto", "keywords": ["neumatico", "neumaticos"], "productos": ["Neumáticos"], "nueva": true, "url": "https://sibom.slyt.gba.gob.ar/bulletins/15468/contents/2423123", "fecha_pub_iso": "2026-07-29", "fecha_pub_label": "29/07/2026", "fecha_ap_iso": "", "fecha_ap_label": "", "dias_apertura": null, "detectada": "2026-08-28", "corrida": "2026-09-01", "contacto": {"email": "", "telefono": "", "web_compras": "https://gobiernoabierto.tandil.gov.ar/acceso-informacion-publica/compras-y-contrataciones/", "notas": "Departamento de Compras - usa el sistema de autogestion (autogestion.tandil.gov.ar). Belgrano 485. Sin email publicado."}}, {"fuente": "sibom", "comprador": "Tandil", "objeto": "Decreto Nº2070/2026 en el boletín 345º de Tandil", "fragmento": "de la compra de llantas y cubiertas del tractor Massey Ferguson 265 que se utiliza para tareas de mantenimiento dentro ... […] La solicitud realizada por el Ente Administrador del Parque Industrial […] a lo dispuesto por la Ordenanza N°12.646 y poder cubrir los gastos de la compra de llantas y cubiertas del tractor Massey Ferguson 265 que se utiliza para tareas ...", "texto": "de la compra de llantas y cubiertas del tractor Massey Ferguson 265 que se utiliza para tareas de mantenimiento dentro ... […] La solicitud realizada por el Ente Administrador del Parque Industrial […] a lo dispuesto por la Ordenanza N°12.646 y poder cubrir los gastos de la compra de llantas y cubiertas del tractor Massey Ferguson 265 que se utiliza para tareas ...", "ref": "Decreto Nº2070/2026 en el boletín 345º de Tandil", "tipo": "", "id_origen": "https://sibom.slyt.gba.gob.ar/bulletins/15286/contents/2410659", "estado": "", "grupo": "cerrada", "cierre": "vencida_estimada", "por_vencer": false, "zona": "volumen_alto", "keywords": ["llanta", "llantas"], "productos": ["Llantas"], "nueva": true, "url": "https://sibom.slyt.gba.gob.ar/bulletins/15286/contents/2410659", "fecha_pub_iso": "2026-07-01", "fecha_pub_label": "01/07/2026", "fecha_ap_iso": "", "fecha_ap_label": "", "dias_apertura": null, "detectada": "2026-08-28", "corrida": "2026-09-01", "contacto": {"email": "", "telefono": "", "web_compras": "https://gobiernoabierto.tandil.gov.ar/acceso-informacion-publica/compras-y-contrataciones/", "notas": "Departamento de Compras - usa el sistema de autogestion (autogestion.tandil.gov.ar). Belgrano 485. Sin email publicado."}}, {"fuente": "sibom", "comprador": "Nueve de Julio", "objeto": "Decreto Nº689/2026 en el boletín 121º de Nueve de Julio", "fragmento": "Que corresponde dictar acto administrativo expreso, de conformidad a las constancias enunciadas ... […] La comunicación NO–2026-00012016-MUNINUE-SSC#SAH. El expediente Nº 4082-262/26. La solicitud de la Secretaría de Obras y Servicios Públicos y la Secretaria de Gobierno. Las invitaciones a cotizar y los presupuestos ... […] LLAMADO A LICITACION Nº 13 - NEUMATICOS - ADJUDICACIÓN. ...", "texto": "Que corresponde dictar acto administrativo expreso, de conformidad a las constancias enunciadas ... […] La comunicación NO–2026-00012016-MUNINUE-SSC#SAH. El expediente Nº 4082-262/26. La solicitud de la Secretaría de Obras y Servicios Públicos y la Secretaria de Gobierno. Las invitaciones a cotizar y los presupuestos ... […] LLAMADO A LICITACION Nº 13 - NEUMATICOS - ADJUDICACIÓN. ...", "ref": "Decreto Nº689/2026 en el boletín 121º de Nueve de Julio", "tipo": "", "id_origen": "https://sibom.slyt.gba.gob.ar/bulletins/14909/contents/2392207", "estado": "adjudicada", "grupo": "cerrada", "cierre": "", "por_vencer": false, "zona": "volumen_alto", "keywords": ["neumatico", "neumaticos"], "productos": ["Neumáticos"], "nueva": true, "url": "https://sibom.slyt.gba.gob.ar/bulletins/14909/contents/2392207", "fecha_pub_iso": "2026-06-02", "fecha_pub_label": "02/06/2026", "fecha_ap_iso": "", "fecha_ap_label": "", "dias_apertura": null, "detectada": "2026-08-28", "corrida": "2026-08-31", "contacto": {"email": "", "telefono": "02317-610000", "web_compras": "https://www.9dejulio.gov.ar/", "notas": "Libertad 934, 9 de Julio. Sin email de compras identificado."}}, {"fuente": "sibom", "comprador": "Bahia Blanca", "objeto": "Decreto Nº1163 en el boletín 499º de Bahia Blanca", "fragmento": ", y; CONSIDERANDO: Que la presente contratación consiste en el alquiler de equipos telefónicos para el Proceso Apell, el cual incluye 20 equipos transceptores comunes, reposición de baterías ... […] no antiexplosivos, 5 equipos transceptores portátiles intrínsecamente seguros con reposición de baterías , 9 transceptores portátiles, reposición de baterías , 2 equipos base completo y el mantenimiento bases ... […] a la firma BAHIA COMUNICACIONES S.A. - Proveedor Nº 5.375, el alquiler de 5 (CINCO) Equipos Transceptores portátiles, intrinsecameante seguros con reposición de baterias , 20 (VEINTE)", "texto": ", y; CONSIDERANDO: Que la presente contratación consiste en el alquiler de equipos telefónicos para el Proceso Apell, el cual incluye 20 equipos transceptores comunes, reposición de baterías ... […] no antiexplosivos, 5 equipos transceptores portátiles intrínsecamente seguros con reposición de baterías , 9 transceptores portátiles, reposición de baterías , 2 equipos base completo y el mantenimiento bases ... […] a la firma BAHIA COMUNICACIONES S.A. - Proveedor Nº 5.375, el alquiler de 5 (CINCO) Equipos Transceptores portátiles, intrinsecameante seguros con reposición de baterias , 20 (VEINTE)", "ref": "Decreto Nº1163 en el boletín 499º de Bahia Blanca", "tipo": "", "id_origen": "https://sibom.slyt.gba.gob.ar/bulletins/15325/contents/2412681", "estado": "", "grupo": "ruido", "cierre": "", "por_vencer": false, "zona": "volumen_alto", "keywords": ["bateria", "baterias"], "productos": ["Baterías"], "nueva": true, "url": "https://sibom.slyt.gba.gob.ar/bulletins/15325/contents/2412681", "fecha_pub_iso": "2026-07-08", "fecha_pub_label": "08/07/2026", "fecha_ap_iso": "", "fecha_ap_label": "", "dias_apertura": null, "detectada": "2026-08-31", "corrida": "2026-08-31", "contacto": null}, {"fuente": "sibom", "comprador": "Bahia Blanca", "objeto": "Decreto Nº1415 en el boletín 499º de Bahia Blanca", "fragmento": "reguladora, batería y antena omnidireccional, y 5 equipos transceptores portátiles, intrínsecamente seguros con reposición de baterías ; Que a fojas 7, el Comité Técnico Ejecutivo, fundamenta ... […] - Transceptores Portátiles Sistema de Trunking, incluye 1 (uno) Equipo Base Completo con Fuente Reguladora, Batería y Antena Omnidireccional y 5 (cinco) Equipos Transceptores Portátiles intrínsecamente seguros ... […] , con reposición de baterías , por el período comprendido entre el 1 de julio y el 31 de diciembre de 2026, por un total de $22.960.782; Por todo lo expuesto, el INTENDENTE MUNICIPAL", "texto": "reguladora, batería y antena omnidireccional, y 5 equipos transceptores portátiles, intrínsecamente seguros con reposición de baterías ; Que a fojas 7, el Comité Técnico Ejecutivo, fundamenta ... […] - Transceptores Portátiles Sistema de Trunking, incluye 1 (uno) Equipo Base Completo con Fuente Reguladora, Batería y Antena Omnidireccional y 5 (cinco) Equipos Transceptores Portátiles intrínsecamente seguros ... […] , con reposición de baterías , por el período comprendido entre el 1 de julio y el 31 de diciembre de 2026, por un total de $22.960.782; Por todo lo expuesto, el INTENDENTE MUNICIPAL", "ref": "Decreto Nº1415 en el boletín 499º de Bahia Blanca", "tipo": "", "id_origen": "https://sibom.slyt.gba.gob.ar/bulletins/15325/contents/2412285", "estado": "", "grupo": "ruido", "cierre": "", "por_vencer": false, "zona": "volumen_alto", "keywords": ["bateria", "baterias"], "productos": ["Baterías"], "nueva": true, "url": "https://sibom.slyt.gba.gob.ar/bulletins/15325/contents/2412285", "fecha_pub_iso": "2026-07-08", "fecha_pub_label": "08/07/2026", "fecha_ap_iso": "", "fecha_ap_label": "", "dias_apertura": null, "detectada": "2026-08-31", "corrida": "2026-08-31", "contacto": null}, {"fuente": "sibom", "comprador": "General San Martín", "objeto": "Decreto Nº00097/26 en el boletín 2040º de General San Martín", "fragmento": "Ampliando monto de obra Cubierta playón deportivo del Parque José Hernández y ampliando plazo de obra. ...", "texto": "Ampliando monto de obra Cubierta playón deportivo del Parque José Hernández y ampliando plazo de obra. ...", "ref": "Decreto Nº00097/26 en el boletín 2040º de General San Martín", "tipo": "", "id_origen": "https://sibom.slyt.gba.gob.ar/bulletins/15141/contents/2400537", "estado": "", "grupo": "ruido", "cierre": "", "por_vencer": false, "zona": "objetivo", "keywords": ["cubierta", "cubiertas"], "productos": ["Neumáticos"], "nueva": true, "url": "https://sibom.slyt.gba.gob.ar/bulletins/15141/contents/2400537", "fecha_pub_iso": "2026-06-04", "fecha_pub_label": "04/06/2026", "fecha_ap_iso": "", "fecha_ap_label": "", "dias_apertura": null, "detectada": "2026-08-28", "corrida": "2026-08-28", "contacto": {"email": "", "telefono": "", "web_compras": "https://www.sanmartin.gob.ar/", "notas": "Direccion de Compras - 2 piso del edificio municipal. Sin email publicado; verificar en el pliego."}}, {"fuente": "pbac", "comprador": "103.13.4.1 - Dir. Pcial. Hospitales - Hospital M.V.De Martinez - Tigre", "objeto": "BATERIAS PARA GRUPO ELECTROGENO", "fragmento": "", "texto": "BATERIAS PARA GRUPO ELECTROGENO", "ref": "Proceso 2026-50-101-293", "tipo": "Procedimiento Abreviado", "id_origen": "2026-50-101-293", "estado": "publicado", "grupo": "ruido", "cierre": "", "por_vencer": false, "zona": "", "keywords": ["bateria"], "productos": ["Baterías"], "nueva": true, "url": "https://pbac.cgp.gba.gov.ar/ListarAperturaProxima.aspx", "fecha_pub_iso": "", "fecha_pub_label": "", "fecha_ap_iso": "2026-09-04", "fecha_ap_label": "04/09/2026 10:00", "dias_apertura": 3, "detectada": "2026-08-31", "corrida": "2026-08-31", "contacto": {"email": "", "telefono": "", "web_compras": "https://pbac.cgp.gba.gov.ar", "notas": "Portal de compras de la Provincia de Bs. As. El contacto puntual de la unidad ejecutora figura DENTRO del pliego de cada proceso."}}]</script>
 <script id="proveedores-data" type="application/json">[{"nombre": "LAROCCA NEUMATICOS S.A.", "tipo": "proveedor / competidor", "detectado_como": "adjudicatario de concursos de precios de cubiertas", "visto_en": "Tandil; Mercedes (SIBOM)"}, {"nombre": "MHR NEUMATICOS S.R.L.", "tipo": "proveedor / competidor", "detectado_como": "oferente en concurso de precios de cubiertas", "visto_en": "Mercedes (SIBOM)"}, {"nombre": "SU LLANT S.A.", "tipo": "proveedor / competidor", "detectado_como": "oferente en licitacion de neumaticos/camaras/llantas", "visto_en": "Pilar (SIBOM)"}, {"nombre": "NEUMATICOS VERONA S.R.L.", "tipo": "proveedor / competidor", "detectado_como": "oferente en licitacion de neumaticos/camaras/llantas", "visto_en": "Pilar (SIBOM)"}, {"nombre": "PERLO AMERICO MAURICIO", "tipo": "proveedor / competidor", "detectado_como": "oferente en licitacion de neumaticos", "visto_en": "Pilar (SIBOM)"}, {"nombre": "ALFREDO IGNACIO CORRAL", "tipo": "proveedor / competidor", "detectado_como": "oferente (desestimado por falta de poliza)", "visto_en": "Pilar (SIBOM)"}, {"nombre": "DUHAU", "tipo": "proveedor de recapado", "detectado_como": "firma que recapa neumaticos para municipios del sudoeste", "visto_en": "Bahia Blanca / Coronel Pringles (SIBOM)"}, {"nombre": "COVYC S.A.", "tipo": "contratista de obra vial", "detectado_como": "adjudicatario de 'fresado y recapado con mezcla bituminosa'", "visto_en": "Avellaneda (SIBOM)"}]</script>
-<script id="meta-data" type="application/json">{"generado": "2026-09-01 12:58", "ultima_corrida": "2026-09-01", "vigentes": 1, "por_vencer": 0, "nuevas": 1, "cerradas": 4, "ruido": 4, "fuentes": ["pbac", "sibom"], "dias_nueva": 7, "dias_sibom": 45}</script>
+<script id="meta-data" type="application/json">{"generado": "2026-09-01 12:16", "ultima_corrida": "2026-09-01", "vigentes": 1, "por_vencer": 0, "nuevas": 1, "cerradas": 4, "ruido": 4, "fuentes": ["pbac", "sibom"], "dias_nueva": 7, "dias_sibom": 45}</script>
+<script id="metricas-data" type="application/json">{"total": 5, "municipios": 4, "adjudicadas": 3, "descartadas": 4, "desde": "2026-08-28", "por_comprador": [{"label": "Tandil", "n": 2}, {"label": "Berazategui", "n": 1}, {"label": "Mercedes", "n": 1}, {"label": "Nueve de Julio", "n": 1}], "por_mes": [{"label": "ago 2026", "n": 5}], "por_producto": [{"label": "Neumáticos", "n": 3}, {"label": "Baterías", "n": 1}, {"label": "Llantas", "n": 1}]}</script>
 <script>
 (function () {
   "use strict";
   var RADAR = JSON.parse(document.getElementById("radar-data").textContent);
   var PROV = JSON.parse(document.getElementById("proveedores-data").textContent);
   var META = JSON.parse(document.getElementById("meta-data").textContent);
+  var MET = JSON.parse(document.getElementById("metricas-data").textContent);
 
   var ZONA_LABEL = {
     objetivo: "Zona objetivo", volumen_alto: "Volumen alto", fuera: "Fuera de zona"
@@ -427,11 +475,12 @@
   var FUENTE_LABEL = { sibom: "SIBOM", pbac: "PBAC", bac: "BAC · CABA" };
 
   var GRUPO_DE_TAB = { vigentes: "vigente", cerradas: "cerrada", ruido: "ruido" };
+  var TABS_VALIDAS = { vigentes: 1, cerradas: 1, metricas: 1, ruido: 1 };
 
   function leerTab() {
     try {
       var t = localStorage.getItem("radar-tab");
-      return GRUPO_DE_TAB[t] ? t : "vigentes";
+      return TABS_VALIDAS[t] ? t : "vigentes";
     } catch (e) { return "vigentes"; }
   }
 
@@ -610,25 +659,75 @@
       "recapado asfáltico de calzada, etc.). A la vista para poder auditarlos."
   };
 
+  function barChart(datos, subtitulo) {
+    if (!datos.length) return '<p class="chart__sub">Todavía sin datos.</p>';
+    var max = datos.reduce(function (m, d) { return Math.max(m, d.n); }, 1);
+    var rows = datos.map(function (d) {
+      var pct = Math.round(d.n / max * 100);
+      return '<div class="barh__row" title="' + esc(d.label + ": " + d.n) + '">' +
+        '<span class="barh__lbl">' + esc(d.label) + "</span>" +
+        '<span class="barh__track"><span class="barh__fill" style="width:' + pct + '%"></span></span>' +
+        '<span class="barh__val">' + d.n + "</span></div>";
+    }).join("");
+    return (subtitulo ? '<p class="chart__sub">' + esc(subtitulo) + "</p>" : "") +
+      '<div class="barh">' + rows + "</div>";
+  }
+
+  function renderMetricas() {
+    if (!MET.total) {
+      return '<div class="empty">La sección de métricas se llena a medida que el radar ' +
+        "acumula corridas. Todavía hay muy pocos datos.</div>";
+    }
+    var stat = function (n, l) {
+      return '<div class="met__stat"><b>' + n + "</b><span>" + esc(l) + "</span></div>";
+    };
+    return '<div class="met">' +
+      '<div class="met__stats">' +
+        stat(MET.total, "licitaciones detectadas") +
+        stat(MET.municipios, "compradores distintos") +
+        stat(MET.adjudicadas, "adjudicadas registradas") +
+        stat(MET.descartadas, "descartadas por el filtro") +
+      "</div>" +
+      '<div><p class="chart__t">Compradores con más licitaciones</p>' +
+        barChart(MET.por_comprador, "acumulado histórico, sin contar el ruido") + "</div>" +
+      '<div><p class="chart__t">Detecciones por mes</p>' +
+        barChart(MET.por_mes, "cuándo aparecieron (por fecha de detección)") + "</div>" +
+      '<div><p class="chart__t">Por producto</p>' +
+        barChart(MET.por_producto, "una licitación puede contar en más de una categoría") + "</div>" +
+      (MET.desde ? '<p class="chart__sub">Datos desde ' + esc(MET.desde) + ".</p>" : "") +
+      "</div>";
+  }
+
   function render() {
-    var grupo = GRUPO_DE_TAB[state.tab] || "vigente";
-    var rows = RADAR.filter(function (r) { return r.grupo === grupo && pasaBusqueda(r); });
-    if (state.tab === "vigentes" && state.sub === "porvencer")
-      rows = rows.filter(function (r) { return r.por_vencer; });
-    if (state.tab === "vigentes" && state.sub === "nuevas")
-      rows = rows.filter(function (r) { return r.nueva; });
+    var lista = document.getElementById("lista");
+    var ctrl = document.getElementById("controls");
 
-    var subTxt = state.sub === "porvencer" ? " · filtrando: por vencer"
-      : state.sub === "nuevas" ? " · filtrando: nuevas" : "";
-    var body = rows.length
-      ? '<div class="cards">' + rows.map(renderCard).join("") + "</div>"
-      : '<div class="empty">Nada por acá en esta corrida.</div>';
-    document.getElementById("lista").innerHTML =
-      '<section class="section">' +
-      '<p class="section__note">' + esc(NOTA_TAB[state.tab] + subTxt) + "</p>" +
-      body + "</section>";
+    if (state.tab === "metricas") {
+      if (ctrl) ctrl.hidden = true;
+      lista.innerHTML = '<section class="section">' +
+        '<p class="section__note">Resumen de todo lo que el radar viene juntando. ' +
+        "Sirve para ver qué municipios compran más y en qué épocas.</p>" +
+        renderMetricas() + "</section>";
+    } else {
+      if (ctrl) ctrl.hidden = false;
+      var grupo = GRUPO_DE_TAB[state.tab] || "vigente";
+      var rows = RADAR.filter(function (r) { return r.grupo === grupo && pasaBusqueda(r); });
+      if (state.tab === "vigentes" && state.sub === "porvencer")
+        rows = rows.filter(function (r) { return r.por_vencer; });
+      if (state.tab === "vigentes" && state.sub === "nuevas")
+        rows = rows.filter(function (r) { return r.nueva; });
 
-    ["vigentes", "cerradas", "ruido"].forEach(function (t) {
+      var subTxt = state.sub === "porvencer" ? " · filtrando: por vencer"
+        : state.sub === "nuevas" ? " · filtrando: nuevas" : "";
+      var body = rows.length
+        ? '<div class="cards">' + rows.map(renderCard).join("") + "</div>"
+        : '<div class="empty">Nada por acá en esta corrida.</div>';
+      lista.innerHTML = '<section class="section">' +
+        '<p class="section__note">' + esc(NOTA_TAB[state.tab] + subTxt) + "</p>" +
+        body + "</section>";
+    }
+
+    ["vigentes", "cerradas", "metricas", "ruido"].forEach(function (t) {
       var el = document.querySelector('.tab[data-tab="' + t + '"]');
       if (el) el.setAttribute("aria-selected", String(t === state.tab));
     });
@@ -657,8 +756,9 @@
   }
 
   function renderTabCounts() {
-    var c = { vigentes: META.vigentes, cerradas: META.cerradas, ruido: META.ruido };
-    ["vigentes", "cerradas", "ruido"].forEach(function (t) {
+    var c = { vigentes: META.vigentes, cerradas: META.cerradas,
+              metricas: MET.total, ruido: META.ruido };
+    ["vigentes", "cerradas", "metricas", "ruido"].forEach(function (t) {
       var el = document.getElementById("tabn-" + t);
       if (el) el.textContent = c[t];
     });

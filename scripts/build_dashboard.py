@@ -258,6 +258,75 @@ def buscar_contacto(comprador, fuente, contactos):
     return None
 
 
+def cargar_historico():
+    path = os.path.join(DATA, "historico.csv")
+    if not os.path.exists(path):
+        return []
+    with open(path, newline="", encoding="utf-8") as f:
+        return list(csv.DictReader(f))
+
+
+MES_NOMBRE = ["", "ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep",
+              "oct", "nov", "dic"]
+
+
+def _mes_label(iso):
+    """'2026-08-xx' -> 'ago 2026'."""
+    m = re.match(r"(\d{4})-(\d{2})", iso or "")
+    if not m:
+        return ""
+    return f"{MES_NOMBRE[int(m.group(2))]} {m.group(1)}"
+
+
+def construir_metricas(hist):
+    """Agrega el historico para la pestaña Metricas. Ignora el ruido."""
+    from collections import Counter
+
+    reales = [h for h in hist if (h.get("es_ruido") or "").strip().lower() != "si"]
+    estados = [(h.get("estado") or "").strip().lower() for h in reales]
+
+    comp = Counter(h.get("comprador", "").strip() or "—" for h in reales)
+    top = comp.most_common(12)
+    otros = sum(n for _, n in comp.most_common()[12:])
+    por_comprador = [{"label": c, "n": n} for c, n in top]
+    if otros:
+        por_comprador.append({"label": f"otros ({len(comp) - 12})", "n": otros})
+
+    meses = Counter()
+    for h in reales:
+        lab = _mes_label(h.get("primera_vez_visto") or h.get("fecha_publicacion") or "")
+        if lab:
+            meses[lab] += 1
+    # ordenar cronologico por la fecha real, no alfabetico
+    def _key_mes(lab):
+        try:
+            nom, anio = lab.split()
+            return (anio, f"{MES_NOMBRE.index(nom):02d}")
+        except ValueError:
+            return ("9999", "99")
+    por_mes = [{"label": k, "n": meses[k]}
+               for k in sorted(meses, key=_key_mes)][-12:]
+
+    prod = Counter()
+    for h in reales:
+        kws = [k.strip() for k in (h.get("keywords") or "").split(",") if k.strip()]
+        for p in productos_de(kws):
+            prod[p] += 1
+    por_producto = [{"label": p, "n": n} for p, n in prod.most_common()]
+
+    return {
+        "total": len(reales),
+        "municipios": len(comp),
+        "adjudicadas": sum(1 for e in estados if e == "adjudicada"),
+        "descartadas": sum(1 for h in hist
+                           if (h.get("es_ruido") or "").strip().lower() == "si"),
+        "desde": min((h.get("primera_vez_visto", "") for h in hist), default=""),
+        "por_comprador": por_comprador,
+        "por_mes": por_mes,
+        "por_producto": por_producto,
+    }
+
+
 def construir_meta(filas):
     corridas = [f["corrida"] for f in filas if f["corrida"]]
     ultima = max(corridas) if corridas else ""
@@ -280,11 +349,12 @@ def json_para_script(x):
     return json.dumps(x, ensure_ascii=False).replace("</", "<\\/")
 
 
-def render(filas, proveedores, meta):
+def render(filas, proveedores, meta, metricas):
     html = PLANTILLA
     html = html.replace("__RADAR_JSON__", json_para_script(filas))
     html = html.replace("__PROVEEDORES_JSON__", json_para_script(proveedores))
     html = html.replace("__META_JSON__", json_para_script(meta))
+    html = html.replace("__METRICAS_JSON__", json_para_script(metricas))
     return html
 
 
@@ -317,8 +387,9 @@ def main():
     filas = ordenar(cargar_radar(contactos))
     proveedores = cargar_proveedores()
     meta = construir_meta(filas)
+    metricas = construir_metricas(cargar_historico())
 
-    bare = render(filas, proveedores, meta)
+    bare = render(filas, proveedores, meta, metricas)
     os.makedirs(os.path.dirname(args.out), exist_ok=True)
     with open(args.out, "w", encoding="utf-8") as f:
         f.write(bare)
@@ -667,6 +738,51 @@ PLANTILLA = r"""<title>Licitaciones de Neumáticos</title>
     margin-right: 6px; vertical-align: middle;
   }
 
+  /* --- pestaña Métricas --- */
+  .met { display: flex; flex-direction: column; gap: 30px; }
+  .met__stats {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px;
+  }
+  .met__stat {
+    background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
+    padding: 12px 14px;
+  }
+  .met__stat b {
+    font-family: "IBM Plex Mono", monospace; font-weight: 500; font-size: 1.6rem;
+    display: block; line-height: 1; margin-bottom: 4px; font-variant-numeric: tabular-nums;
+  }
+  .met__stat span {
+    font-family: "Libre Franklin", sans-serif; font-weight: 600; font-size: 11px;
+    letter-spacing: .03em; text-transform: uppercase; color: var(--ink-soft);
+  }
+  .chart__t {
+    font-family: "Libre Franklin", sans-serif; font-weight: 700; font-size: 1rem;
+    margin: 0 0 3px;
+  }
+  .chart__sub { font-size: 12px; color: var(--ink-soft); margin: 0 0 14px; }
+  .barh { display: flex; flex-direction: column; gap: 5px; }
+  .barh__row {
+    display: grid; grid-template-columns: 148px 1fr auto; gap: 10px; align-items: center;
+    font-size: 12.5px;
+  }
+  .barh__lbl {
+    color: var(--ink-soft); text-align: right; overflow: hidden;
+    text-overflow: ellipsis; white-space: nowrap;
+  }
+  .barh__track { background: var(--surface-2); border-radius: 3px; height: 16px; }
+  .barh__fill {
+    height: 16px; min-width: 2px; background: var(--accent);
+    border-radius: 3px; transition: filter 120ms ease;
+  }
+  .barh__row:hover .barh__fill { filter: brightness(1.12); }
+  .barh__val {
+    font-family: "IBM Plex Mono", monospace; color: var(--ink);
+    font-variant-numeric: tabular-nums; min-width: 2ch; text-align: right;
+  }
+  @media (max-width: 560px) {
+    .barh__row { grid-template-columns: 96px 1fr auto; }
+  }
+
   @media (prefers-reduced-motion: reduce) {
     * { transition: none !important; }
   }
@@ -696,7 +812,7 @@ PLANTILLA = r"""<title>Licitaciones de Neumáticos</title>
 
   <section class="summary" id="summary" aria-label="Resumen"></section>
 
-  <div class="controls">
+  <div class="controls" id="controls">
     <input type="search" id="q" placeholder="Buscar comprador, objeto, palabra clave…" aria-label="Buscar">
     <select id="producto" aria-label="Filtrar por producto">
       <option value="">Todos los productos</option>
@@ -730,6 +846,7 @@ PLANTILLA = r"""<title>Licitaciones de Neumáticos</title>
   <div class="tabs" id="tabs" role="tablist">
     <button class="tab" data-tab="vigentes" role="tab" aria-selected="true">Vigentes y por vencer<span class="tab__n" id="tabn-vigentes"></span></button>
     <button class="tab" data-tab="cerradas" role="tab" aria-selected="false">Cerradas / adjudicadas<span class="tab__n" id="tabn-cerradas"></span></button>
+    <button class="tab" data-tab="metricas" role="tab" aria-selected="false">Métricas<span class="tab__n" id="tabn-metricas"></span></button>
     <button class="tab" data-tab="ruido" role="tab" aria-selected="false">Descartadas<span class="tab__n" id="tabn-ruido"></span></button>
   </div>
 
@@ -752,12 +869,14 @@ PLANTILLA = r"""<title>Licitaciones de Neumáticos</title>
 <script id="radar-data" type="application/json">__RADAR_JSON__</script>
 <script id="proveedores-data" type="application/json">__PROVEEDORES_JSON__</script>
 <script id="meta-data" type="application/json">__META_JSON__</script>
+<script id="metricas-data" type="application/json">__METRICAS_JSON__</script>
 <script>
 (function () {
   "use strict";
   var RADAR = JSON.parse(document.getElementById("radar-data").textContent);
   var PROV = JSON.parse(document.getElementById("proveedores-data").textContent);
   var META = JSON.parse(document.getElementById("meta-data").textContent);
+  var MET = JSON.parse(document.getElementById("metricas-data").textContent);
 
   var ZONA_LABEL = {
     objetivo: "Zona objetivo", volumen_alto: "Volumen alto", fuera: "Fuera de zona"
@@ -765,11 +884,12 @@ PLANTILLA = r"""<title>Licitaciones de Neumáticos</title>
   var FUENTE_LABEL = { sibom: "SIBOM", pbac: "PBAC", bac: "BAC · CABA" };
 
   var GRUPO_DE_TAB = { vigentes: "vigente", cerradas: "cerrada", ruido: "ruido" };
+  var TABS_VALIDAS = { vigentes: 1, cerradas: 1, metricas: 1, ruido: 1 };
 
   function leerTab() {
     try {
       var t = localStorage.getItem("radar-tab");
-      return GRUPO_DE_TAB[t] ? t : "vigentes";
+      return TABS_VALIDAS[t] ? t : "vigentes";
     } catch (e) { return "vigentes"; }
   }
 
@@ -948,25 +1068,75 @@ PLANTILLA = r"""<title>Licitaciones de Neumáticos</title>
       "recapado asfáltico de calzada, etc.). A la vista para poder auditarlos."
   };
 
+  function barChart(datos, subtitulo) {
+    if (!datos.length) return '<p class="chart__sub">Todavía sin datos.</p>';
+    var max = datos.reduce(function (m, d) { return Math.max(m, d.n); }, 1);
+    var rows = datos.map(function (d) {
+      var pct = Math.round(d.n / max * 100);
+      return '<div class="barh__row" title="' + esc(d.label + ": " + d.n) + '">' +
+        '<span class="barh__lbl">' + esc(d.label) + "</span>" +
+        '<span class="barh__track"><span class="barh__fill" style="width:' + pct + '%"></span></span>' +
+        '<span class="barh__val">' + d.n + "</span></div>";
+    }).join("");
+    return (subtitulo ? '<p class="chart__sub">' + esc(subtitulo) + "</p>" : "") +
+      '<div class="barh">' + rows + "</div>";
+  }
+
+  function renderMetricas() {
+    if (!MET.total) {
+      return '<div class="empty">La sección de métricas se llena a medida que el radar ' +
+        "acumula corridas. Todavía hay muy pocos datos.</div>";
+    }
+    var stat = function (n, l) {
+      return '<div class="met__stat"><b>' + n + "</b><span>" + esc(l) + "</span></div>";
+    };
+    return '<div class="met">' +
+      '<div class="met__stats">' +
+        stat(MET.total, "licitaciones detectadas") +
+        stat(MET.municipios, "compradores distintos") +
+        stat(MET.adjudicadas, "adjudicadas registradas") +
+        stat(MET.descartadas, "descartadas por el filtro") +
+      "</div>" +
+      '<div><p class="chart__t">Compradores con más licitaciones</p>' +
+        barChart(MET.por_comprador, "acumulado histórico, sin contar el ruido") + "</div>" +
+      '<div><p class="chart__t">Detecciones por mes</p>' +
+        barChart(MET.por_mes, "cuándo aparecieron (por fecha de detección)") + "</div>" +
+      '<div><p class="chart__t">Por producto</p>' +
+        barChart(MET.por_producto, "una licitación puede contar en más de una categoría") + "</div>" +
+      (MET.desde ? '<p class="chart__sub">Datos desde ' + esc(MET.desde) + ".</p>" : "") +
+      "</div>";
+  }
+
   function render() {
-    var grupo = GRUPO_DE_TAB[state.tab] || "vigente";
-    var rows = RADAR.filter(function (r) { return r.grupo === grupo && pasaBusqueda(r); });
-    if (state.tab === "vigentes" && state.sub === "porvencer")
-      rows = rows.filter(function (r) { return r.por_vencer; });
-    if (state.tab === "vigentes" && state.sub === "nuevas")
-      rows = rows.filter(function (r) { return r.nueva; });
+    var lista = document.getElementById("lista");
+    var ctrl = document.getElementById("controls");
 
-    var subTxt = state.sub === "porvencer" ? " · filtrando: por vencer"
-      : state.sub === "nuevas" ? " · filtrando: nuevas" : "";
-    var body = rows.length
-      ? '<div class="cards">' + rows.map(renderCard).join("") + "</div>"
-      : '<div class="empty">Nada por acá en esta corrida.</div>';
-    document.getElementById("lista").innerHTML =
-      '<section class="section">' +
-      '<p class="section__note">' + esc(NOTA_TAB[state.tab] + subTxt) + "</p>" +
-      body + "</section>";
+    if (state.tab === "metricas") {
+      if (ctrl) ctrl.hidden = true;
+      lista.innerHTML = '<section class="section">' +
+        '<p class="section__note">Resumen de todo lo que el radar viene juntando. ' +
+        "Sirve para ver qué municipios compran más y en qué épocas.</p>" +
+        renderMetricas() + "</section>";
+    } else {
+      if (ctrl) ctrl.hidden = false;
+      var grupo = GRUPO_DE_TAB[state.tab] || "vigente";
+      var rows = RADAR.filter(function (r) { return r.grupo === grupo && pasaBusqueda(r); });
+      if (state.tab === "vigentes" && state.sub === "porvencer")
+        rows = rows.filter(function (r) { return r.por_vencer; });
+      if (state.tab === "vigentes" && state.sub === "nuevas")
+        rows = rows.filter(function (r) { return r.nueva; });
 
-    ["vigentes", "cerradas", "ruido"].forEach(function (t) {
+      var subTxt = state.sub === "porvencer" ? " · filtrando: por vencer"
+        : state.sub === "nuevas" ? " · filtrando: nuevas" : "";
+      var body = rows.length
+        ? '<div class="cards">' + rows.map(renderCard).join("") + "</div>"
+        : '<div class="empty">Nada por acá en esta corrida.</div>';
+      lista.innerHTML = '<section class="section">' +
+        '<p class="section__note">' + esc(NOTA_TAB[state.tab] + subTxt) + "</p>" +
+        body + "</section>";
+    }
+
+    ["vigentes", "cerradas", "metricas", "ruido"].forEach(function (t) {
       var el = document.querySelector('.tab[data-tab="' + t + '"]');
       if (el) el.setAttribute("aria-selected", String(t === state.tab));
     });
@@ -995,8 +1165,9 @@ PLANTILLA = r"""<title>Licitaciones de Neumáticos</title>
   }
 
   function renderTabCounts() {
-    var c = { vigentes: META.vigentes, cerradas: META.cerradas, ruido: META.ruido };
-    ["vigentes", "cerradas", "ruido"].forEach(function (t) {
+    var c = { vigentes: META.vigentes, cerradas: META.cerradas,
+              metricas: MET.total, ruido: META.ruido };
+    ["vigentes", "cerradas", "metricas", "ruido"].forEach(function (t) {
       var el = document.getElementById("tabn-" + t);
       if (el) el.textContent = c[t];
     });

@@ -33,6 +33,7 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 DATA = os.path.normpath(os.path.join(HERE, "..", "data"))
 CSV_RADAR = os.path.join(DATA, "radar_sin_verificar.csv")
+CSV_HISTORICO = os.path.join(DATA, "historico.csv")
 
 CAMPOS = [
     "fuente", "id_origen", "comprador", "objeto", "tipo",
@@ -40,6 +41,9 @@ CAMPOS = [
     "categoria_zona", "es_ruido", "keywords", "url", "fragmento",
     "primera_vez_visto", "vista_ultima_corrida",
 ]
+# historico.csv: mismo formato + una fecha de ultima aparicion. NUNCA se borra
+# nada de aca; alimenta la pestaña "Metricas" del panel.
+CAMPOS_HIST = CAMPOS + ["ultima_vez_visto"]
 
 sys.path.insert(0, HERE)
 import bac_mvp  # noqa: E402
@@ -126,6 +130,42 @@ def cargar_previo():
         return {}
     with open(CSV_RADAR, newline="", encoding="utf-8") as f:
         return {(row["fuente"], row["id_origen"]): row for row in csv.DictReader(f)}
+
+
+def actualizar_historico(rows_actuales, hoy):
+    """Upsert de todo lo detectado en `historico.csv`. No borra nada: las
+    licitaciones vencidas / adjudicadas quedan para siempre como serie historica.
+    Devuelve (total_filas, filas_nuevas_hoy)."""
+    prev = {}
+    if os.path.exists(CSV_HISTORICO):
+        with open(CSV_HISTORICO, newline="", encoding="utf-8") as f:
+            for r in csv.DictReader(f):
+                prev[(r.get("fuente"), r.get("id_origen"))] = r
+
+    nuevas = 0
+    for row in rows_actuales:
+        k = (row.get("fuente"), row.get("id_origen"))
+        h = prev.get(k)
+        if h is None:
+            h = {c: row.get(c, "") for c in CAMPOS}
+            h["primera_vez_visto"] = row.get("primera_vez_visto") or hoy
+            prev[k] = h
+            nuevas += 1
+        else:
+            # campos que pueden cambiar con el tiempo
+            if row.get("estado"):
+                h["estado"] = row["estado"]
+            if row.get("fecha_apertura"):
+                h["fecha_apertura"] = row["fecha_apertura"]
+            h["es_ruido"] = row.get("es_ruido", h.get("es_ruido", "no"))
+        h["ultima_vez_visto"] = hoy
+
+    with open(CSV_HISTORICO, "w", newline="", encoding="utf-8") as f:
+        w = csv.DictWriter(f, fieldnames=CAMPOS_HIST)
+        w.writeheader()
+        for h in prev.values():
+            w.writerow({c: h.get(c, "") for c in CAMPOS_HIST})
+    return len(prev), nuevas
 
 
 _FECHA_RE = re.compile(r"(\d{2})/(\d{2})/(\d{4})")
@@ -217,6 +257,9 @@ def main():
 
     todas = nuevas + siguen + solo_antes
 
+    # Historico (antes de podar): acumula TODO lo detectado, nunca borra.
+    hist_total, hist_nuevas = actualizar_historico(todas, hoy)
+
     # Vencimiento automatico: sacar del CSV lo que ya termino y quedo viejo.
     hoy_d = dt.date.today()
     vivas = [r for r in todas if not esta_muerta(r, hoy_d)]
@@ -235,6 +278,7 @@ def main():
     print(f"\n=== RESUMEN corrida {hoy} ===")
     print(f"  {len(encontrados)} licitaciones activas encontradas hoy")
     print(f"  {len(nuevas)} NUEVAS respecto de la corrida anterior")
+    print(f"  historico: {hist_total} filas ({hist_nuevas} nuevas hoy)")
     if caducadas:
         print(f"  {caducadas} caducadas (sacadas del CSV por vencimiento)")
     print(f"  {len(todas)} filas totales en {os.path.basename(CSV_RADAR)}")

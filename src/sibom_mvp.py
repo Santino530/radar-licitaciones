@@ -295,13 +295,72 @@ def to_date(s):
         return None
 
 
+# --- Enriquecer con el texto completo del decreto -------------------------
+# La pagina /bulletins/<b>/contents/<c> trae el decreto entero (salvo cuando
+# dice "version extractada"). De ahi se saca la fecha de apertura de sobres y
+# un estado mas confiable.
+_APERTURA_RE = re.compile(
+    r"apertura(?:\s+de\s+sobres|\s+de\s+ofertas|\s+de\s+la\s+licitaci[oó]n)?"
+    r"[^.;]{0,90}?(\d{2}/\d{2}/\d{4})", re.I)
+_EXPTE_RE = re.compile(
+    r"(EX-\d{4}-[\dA-Z#\-]+|expediente\s*N[°ºo]?\s*[\d\-/.]+)", re.I)
+_TIPO_RE = re.compile(
+    r"((?:Licitaci[oó]n\s+(?:P[uú]blica|Privada)|Concurso\s+de\s+Precios|"
+    r"Contrataci[oó]n\s+Directa|Compra\s+Directa)\s*(?:N[°ºo]?\s*[\d/.\-]+)?)", re.I)
+
+
+def texto_pagina(html_page):
+    t = re.sub(r"<(script|style)[^>]*>.*?</\1>", " ", html_page, flags=re.S)
+    t = re.sub(r"<[^>]+>", " ", t)
+    return re.sub(r"\s+", " ", html.unescape(t)).strip()
+
+
+def enriquecer(row, pause=1.0):
+    """Baja la pagina del contenido y completa fecha_apertura / expediente /
+    estado / fragmento con el texto completo. Si algo falla, deja la fila igual."""
+    try:
+        pagina = fetch_reintentos(row["url"])
+    except Exception as e:  # noqa: BLE001
+        print(f"  . no se pudo enriquecer {row['url']} ({e})", file=sys.stderr)
+        return row
+    t = texto_pagina(pagina)
+    if not t or "versión extractada" in t.lower() or "version extractada" in t.lower():
+        return row  # SIBOM solo publico el extracto; no hay mas que sacar
+
+    # cortar el encabezado repetido del portal
+    i = t.find("Boletines/")
+    cuerpo = t[i:] if i >= 0 else t
+
+    m = _APERTURA_RE.search(cuerpo)
+    if m:
+        row["fecha_apertura"] = m.group(1)
+    ex = _EXPTE_RE.search(cuerpo)
+    if ex:
+        row["expediente"] = re.sub(r"\s+", " ", ex.group(0)).strip(" .,;")
+    tp = _TIPO_RE.search(cuerpo)
+    if tp:
+        row["tipo"] = re.sub(r"\s+", " ", tp.group(1)).strip()
+
+    est = detectar_estado(cuerpo)
+    if est:
+        row["estado"] = est
+
+    row["fragmento"] = cuerpo[:1100]
+    if pause:
+        time.sleep(pause)
+    return row
+
+
 def recolectar(desde=None, max_pages=8, solo_zona=True, incluir_ruido=True,
-               verbose=False):
+               verbose=False, enriquecer_detalle=True):
     """Devuelve una lista de dicts normalizados de SIBOM. La usa el orquestador
     (src/radar.py) y tambien main() de este script.
 
     Campos de cada dict: municipio, categoria_zona, es_ruido, fecha_publicacion,
-    titulo, url, tags, keywords (set), fragmento.
+    fecha_apertura, expediente, titulo, url, tags, keywords (set), fragmento.
+
+    Con enriquecer_detalle=True baja el texto completo del decreto de cada fila
+    que pasa los filtros (1 request extra c/u) para completar fecha de apertura.
     """
     corte = None
     if isinstance(desde, str):
@@ -324,6 +383,9 @@ def recolectar(desde=None, max_pages=8, solo_zona=True, incluir_ruido=True,
         r["categoria_zona"] = clasificar_zona(r["municipio"])
         r["es_ruido"] = es_ruido(texto)
         r["estado"] = detectar_estado(texto)
+        r.setdefault("fecha_apertura", "")
+        r.setdefault("expediente", "")
+        r.setdefault("tipo", "")
 
     if solo_zona:
         rows = [r for r in rows if r["categoria_zona"] in ("objetivo", "volumen_alto")]
@@ -332,6 +394,17 @@ def recolectar(desde=None, max_pages=8, solo_zona=True, incluir_ruido=True,
                 if (d := to_date(r["fecha_publicacion"])) and d >= corte]
     if not incluir_ruido:
         rows = [r for r in rows if not r["es_ruido"]]
+
+    # Enriquecer solo lo que quedo tras los filtros (pocas requests extra).
+    if enriquecer_detalle:
+        for j, r in enumerate(rows, 1):
+            if verbose:
+                print(f"   . detalle {j}/{len(rows)} {r['municipio']}", file=sys.stderr)
+            enriquecer(r)
+        # el estado puede haber cambiado con el texto completo -> re-filtrar ruido
+        if not incluir_ruido:
+            rows = [r for r in rows
+                    if not es_ruido(r["titulo"] + " " + r["tags"] + " " + r["fragmento"])]
 
     rows.sort(key=lambda r: (to_date(r["fecha_publicacion"]) or dt.date.min), reverse=True)
     if verbose:

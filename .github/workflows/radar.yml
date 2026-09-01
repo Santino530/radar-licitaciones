@@ -35,14 +35,20 @@ jobs:
       - name: Correr el radar
         run: python src/radar.py
 
+      - name: Regenerar el panel
+        run: python scripts/build_dashboard.py
+
       - name: Guardar novedades en el repo
         run: |
           git config user.name  "radar-bot"
           git config user.email "radar-bot@users.noreply.github.com"
-          git add data/radar_sin_verificar.csv
+          git add data/radar_sin_verificar.csv web/dashboard.html docs/index.html
           if git diff --cached --quiet; then
             echo "Sin cambios en el radar."
           else
             git commit -m "Radar: corrida $(date -u +'%Y-%m-%d %H:%M UTC')"
             git push
           fi
+
+      # docs/index.html se sirve como GitHub Pages -> link publico que se
+      # actualiza solo en cada push. Pages redeploya automaticamente.

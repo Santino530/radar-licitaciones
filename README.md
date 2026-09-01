@@ -1,196 +1,49 @@
-# Radar de licitaciones
+# Radar de licitaciones — neumáticos
 
-## 1. Qué problema busca resolver
+Detecta a diario **licitaciones públicas** cuyo objeto sean neumáticos, recapado,
+llantas, cámaras, baterías de vehículo o protectores, publicadas por municipios y
+organismos del sector estatal argentino (foco AMBA + Provincia de Buenos Aires).
 
-La empresa quiere venderle neumáticos nuevos, recapado y servicio a **municipios y
-organismos públicos**, pero ese canal se compra casi siempre por **licitación**. Hoy
-nadie revisa de forma sistemática qué licitaciones de neumáticos / cubiertas / recapado
-están abiertas en los municipios del AMBA. Cuando alguien se entera, muchas veces ya
-venció el plazo para presentarse. La detección es manual, dispersa y tardía.
+## Cómo funciona
 
-Este proyecto es la continuación natural de `busqueda-clientes-potenciales`: en ese
-Excel ya identificamos ~32 municipios/organismos y marcamos que 36 prospectos compran
-por **licitación pública**. Este proyecto se ocupa de **enterarse a tiempo de cada
-llamado** de esos compradores.
+1. **Motor** (`src/radar.py`) — corre en GitHub Actions 3 veces por día. Consulta tres
+   fuentes y guarda lo que matchea en `data/radar_sin_verificar.csv`:
+   - `src/sibom_mvp.py` — SIBOM, el boletín oficial digital de ~135 municipios de la
+     Provincia de Buenos Aires.
+   - `src/pbac_mvp.py` — PBAC, compras electrónicas de la Provincia de Buenos Aires.
+   - `src/bac_mvp.py` — BAC, compras electrónicas de la Ciudad de Buenos Aires.
+2. **Filtros** — palabras clave del rubro + descarte de falsos positivos (cámara de
+   video, batería de generador, recapado asfáltico de calzada, etc.). Cada licitación
+   se clasifica en *vigente* / *cerrada* / *descartada* y caduca sola cuando pasa la
+   fecha de apertura (o, si no hay fecha, a los 45 días de publicada).
+3. **Panel** (`scripts/build_dashboard.py`) — genera `docs/index.html`, servido como
+   GitHub Pages: `https://santino530.github.io/radar-licitaciones/`. Se regenera y
+   publica en cada corrida del motor.
 
-## 2. Por qué es relevante para la empresa
-
-- Las flotas municipales (camiones de residuos, volquetes, colectivos, utilitarios) son
-  negocio de **volumen y recurrencia**, exactamente donde el recapado tiene mejor margen.
-- El plazo entre publicación y apertura de una licitación suele ser corto (días). Perder
-  el aviso = perder la oportunidad entera hasta el año siguiente.
-- Un radar que avise "hoy salió esta licitación, vence tal día" permite que la empresa
-  llegue a presentarse **preparada** en vez de a las corridas o directamente afuera.
-
-## 3. Objetivo
-
-Una **web propia que se actualiza sola todos los días** y muestra las licitaciones
-públicas **activas** relacionadas con neumáticos / recapado / gomería de los municipios
-y organismos que ya están en el Excel `Prospeccion_Clientes_Flotas.xlsx`, con su fecha
-de apertura, estado y link al pliego.
-
-## 4. Alcance
-
-**Incluye:**
-- Los municipios y organismos del AMBA que figuran en la hoja *Prospectos* del Excel
-  (los que tienen *Modalidad de compra = licitación pública*).
-- Licitaciones, contrataciones y compras cuyo objeto sea:
-  - **Principal:** neumáticos, cubiertas, llantas, recapado / recauchutaje, o servicio
-    de gomería (alineación, balanceo, reparación de cubiertas).
-  - **Secundario** (otros productos que la empresa también vende): baterías de auto /
-    camión, cámaras de neumático (cámaras de aire) y protectores de neumático.
-- Un panel diario con: comprador, número y objeto del llamado, fecha de publicación,
-  fecha de apertura, estado (abierta / por vencer / cerrada) y link a la fuente oficial.
-
-**No incluye (por ahora):**
-- Armar la oferta / preparar la documentación para presentarse (eso es trabajo del
-  equipo comercial y administración).
-- Licitaciones privadas y de flotas privadas (eso ya se trabaja desde el Excel).
-- Provincias fuera del AMBA.
-- Decidir bajo qué sector se presenta la empresa (**San Justo Neumáticos S.R.L.** o
-  **Centro Integral de Neumáticos**): el radar sólo informa; la decisión es de los dueños.
-
-## 5. Usuarios
-
-- **Dueños / responsable comercial:** miran el panel para decidir a qué llamados vale la
-  pena presentarse.
-- **Administración:** usa la fecha de apertura y el link al pliego para preparar la
-  presentación en término.
-
-## 6. Información necesaria
-
-| Dato | Fuente | Estado |
-|---|---|---|
-| Lista de municipios/organismos objetivo | Hoja *Prospectos* del Excel `Prospeccion_Clientes_Flotas.xlsx` | Ya existe |
-| Portales de compras públicas donde publican esos municipios | PBAC (Provincia de Bs. As.), SIBOM (boletines oficiales municipales), BAC (CABA), COMPR.AR / CONTRAT.AR (Nación), y el sitio propio de cada municipio | A relevar por municipio |
-| Palabras clave del rubro | **Principal:** neumático(s), cubierta(s), llanta(s), recapado, recauchutaje, gomería. **Secundario:** cámara de aire, batería de auto/camión, protector de neumático. Cada palabra ruidosa ("cámara", "batería", "protector") lleva su propio filtro de falsos positivos. | Definido (ajustable) |
-| CUIT / datos de la empresa para registrarse como proveedor en cada portal | Interno | Pendiente de confirmar con la empresa |
-| Cada cuánto publica cada municipio y con qué anticipación | Se aprende observando el radar unas semanas | Pendiente |
-
-## 7. Funcionamiento esperado
-
-1. Una vez por día, un proceso automático recorre los portales de compras públicas y los
-   sitios de los municipios objetivo.
-2. Filtra las publicaciones nuevas por las palabras clave del rubro.
-3. Guarda las que coinciden en una base (comprador, objeto, fechas, link, estado).
-4. Marca el estado según la fecha de apertura: **abierta**, **por vencer** (faltan ≤ X
-   días) o **cerrada**.
-5. La web muestra la lista ordenada por urgencia (las que están por vencer arriba).
-6. *(Etapa posterior)* además del panel, un aviso diario por mail / WhatsApp con lo nuevo
-   y lo que está por vencer.
-
-## 8. Tecnologías y arquitectura (decidido 2026-08-27)
-
-> El usuario no es programador avanzado: cada decisión técnica se explica antes de
-> implementarla, y se elige siempre la opción más simple que funcione.
-
-**Se construye el radar propio** (no se contrata un agregador comercial — ver
-`docs/decisiones.md`). Detalle de fuentes en `docs/fuentes-y-adquisicion.md`.
-
-- **Ingesta = conectores por tipo de fuente**, no por municipio:
-  1. `sibom` — boletines de ~135 municipios de PBA (búsqueda GET, filtro `type=Licitación`).
-  2. `pbac` — Provincia + organismos + municipios adheridos.
-  3. `bac_ocds` — datos abiertos de CABA (formato Open Contracting).
-  4. `comprar_ocds` — datos abiertos de Nación (opcional, sólo si entra un organismo nacional).
-  5. `municipal_html` — sólo para huecos comprobados (RAFAM primero, es multi-municipio).
-- **El scraper corre en GitHub Actions** (cron 1–2x/día). Hace `git commit` del CSV del
-  radar. No corre en la rutina de la nube de Anthropic (tiene `WebFetch` bloqueado) ni en
-  la PC de Santino (tendría que estar prendida).
-- **Dashboard + aviso al celular:** se reusa el molde de `busqueda-laboral`
-  (`docs/blueprint-referencia.md`): Artifact publicado + `PushNotification`, disparado por
-  la rutina en la nube o por una sesión interactiva.
-- **MVP (primero):** un script del conector `sibom` que consulta 3 municipios de prueba y
-  devuelve la lista filtrada por palabras clave. Sirve para medir cuánto trae cada fuente
-  antes de armar toda la infra.
-- **Lenguaje:** a definir al escribir el MVP (Python es lo que ya se usó en
-  `busqueda-clientes-potenciales`).
-
-## 9. Estado actual (2026-09-01)
-
-**El motor ya corre solo en GitHub Actions.** Repo privado:
-`https://github.com/Santino530/radar-licitaciones`. El workflow corrió OK (corrida
-manual del 2026-09-01) y commiteó `data/radar_sin_verificar.csv` como `radar-bot`.
-Cron: 12/16/21 UTC = 09/13/18 hs ART.
-
-
-- **Fuentes relevadas:** `docs/fuentes-y-adquisicion.md`, `docs/inventario-fuentes-completo.md`,
-  `data/fuentes_objetivo.csv`.
-- **Conectores funcionando:**
-  - `src/sibom_mvp.py` — boletines de los ~135 municipios de PBA. Grupos "objetivo"
-    (AMBA) y "volumen_alto" (partidos del interior con Dirección Vial grande), filtro de
-    ruido, ventana de días.
-  - `src/pbac_mvp.py` — "apertura próxima" de toda la Provincia, vía el botón
-    "Descargar Reporte Excel" (una request → xlsx con ~400-470 procesos).
-  - `src/bac_mvp.py` — "apertura próxima" de la Ciudad de Buenos Aires (BAC). Es el
-    mismo software que PBAC; reutiliza casi todo de `pbac_mvp.py`. Diferencias: hay que
-    pedir la página dos veces (la 1ª rebota para crear la sesión) y mandar un token
-    anti-CSRF extra.
-- **Motor / orquestador:** `src/radar.py` corre todos los conectores, normaliza a
-  `data/radar_sin_verificar.csv` y marca lo **nuevo respecto de la corrida anterior**
-  (`primera_vez_visto` = "nueva apertura").
-- **Automatización:** `.github/workflows/radar.yml` — corre `radar.py` 3 veces por día
-  y commitea el CSV. **Activo** (repo en GitHub, permisos de workflow en "write").
-- **Panel:** `scripts/build_dashboard.py` arma `web/dashboard.html` desde los CSV. Se
-  publica como Artifact privado (link en `web/dashboard_url.txt`) para compartir con
-  quien tenga que verlo. Tocando el nombre del comprador se despliega el detalle
-  completo del pliego + el contacto de compras (de `data/contactos_compras.csv`, tabla
-  manual que el equipo va completando; si no hay, ofrece un botón "buscar contacto").
-  Tiene tema claro/oscuro, filtro por producto y marca de "nueva" (≤7 días). Falta: que
-  se actualice solo con los datos de GitHub, y los botones de ✓/✗ para triar.
-- **Falta:** que el panel se actualice solo con los datos de GitHub, notificación push,
-  botones de ✓/✗, y conectores Nación / Boletín provincial / portales municipales.
-
-## 10. Próximos pasos
-
-1. Que el panel se actualice solo: una rutina en la nube que hace `git pull`, corre
-   `build_dashboard.py` y republica el Artifact con la misma URL.
-2. Notificación push con lo nuevo de cada corrida.
-3. Botones ✓/✗ en el panel para triar desde la página (capacidad `artifact`).
-4. Portales municipales de los partidos del AMBA que no publican en SIBOM (ver
-   `docs/portales-municipales.md`); Boletín Oficial PBA como respaldo legal.
-5. Retomar `comprar` (Nación): postergado el 2026-08-31 — el portal resiste el
-   postback y los datos abiertos se actualizan cada 6 meses (ver `docs/decisiones.md`).
-6. Afinar filtros de ruido y palabras clave con lo que vaya juntando el radar.
-7. Confirmar con la empresa con qué CUIT / sector (San Justo Neumáticos S.R.L. o Centro
-   Integral de Neumáticos) se presenta a licitaciones.
-
----
-
-### Estructura de la carpeta
+## Estructura
 
 ```text
-/radar-licitaciones
-    README.md
-    .github/workflows/radar.yml   ← corre el motor 3x/día (al subir a GitHub)
-    /docs
-        decisiones.md
-        fuentes-y-adquisicion.md
-        inventario-fuentes-completo.md
-        portales-municipales.md       ← links de los portales de compras por municipio
-        grandes-flotas.md             ← entes estatales / empresas privadas con flota grande
-        blueprint-referencia.md
-    /data
-        fuentes_objetivo.csv          ← fuentes clasificadas por tipo de conector
-        proveedores_conocidos.csv     ← proveedores/competidores que ya venden al Estado
-        contactos_compras.csv         ← comprador → mail/tel de la oficina de compras (manual)
-        sibom_city_ids.csv            ← municipio → id en SIBOM
-        radar_sin_verificar.csv       ← salida del motor (lo que hay que verificar)
-        planilla_*.csv                ← export de la Google Sheet (ignorado por git)
-    /src
-        radar.py       ← orquestador: corre todo y arma radar_sin_verificar.csv
-        sibom_mvp.py    ← conector SIBOM (boletines municipales PBA)
-        pbac_mvp.py     ← conector PBAC (compras Provincia de Bs. As.)
-        bac_mvp.py      ← conector BAC (compras Ciudad de Bs. As.)
-    /scripts
-        build_dashboard.py  ← arma web/dashboard.html desde los CSV
-    /web
-        dashboard.html      ← el panel (se publica como Artifact)
-        dashboard_url.txt   ← el link del Artifact publicado
+.github/workflows/radar.yml   corre el motor 3x/día y publica el panel
+src/
+  radar.py        orquestador
+  sibom_mvp.py    conector SIBOM
+  pbac_mvp.py     conector PBAC
+  bac_mvp.py      conector BAC
+scripts/build_dashboard.py    arma el panel HTML desde los CSV
+data/
+  radar_sin_verificar.csv     salida del motor
+  contactos_compras.csv       comprador → oficina de compras (dato de webs oficiales)
+  proveedores_conocidos.csv   adjudicatarios detectados (dato de boletines oficiales)
+  fuentes_objetivo.csv · sibom_city_ids.csv
+docs/index.html               el panel (GitHub Pages)
+web/dashboard.html            misma página, versión para publicar como Artifact
 ```
 
-### Relación con otros proyectos
+## Notas técnicas
 
-- **`busqueda-clientes-potenciales`**: le da la lista de municipios objetivo. Este
-  proyecto no la reemplaza; se enfoca sólo en el canal licitación pública.
-- Ambos son del área **comercial** de la empresa, pero se mantienen separados: distinto
-  objetivo, distintos datos, distinto desarrollo.
+- Los conectores usan sólo librería estándar de Python salvo `openpyxl` (lectura del
+  reporte Excel de PBAC/BAC).
+- Los certificados SSL de SIBOM y PBAC pueden estar vencidos → se usa contexto sin
+  verificación (fuentes oficiales del Estado).
+- Los datos se muestran **sin verificar**: antes de presentarse a una licitación hay que
+  abrir el pliego en la fuente oficial y confirmar objeto, fechas y condiciones.

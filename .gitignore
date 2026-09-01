@@ -17,3 +17,11 @@ data/bac_ReporteProcesos.xlsx
 
 # salidas de prueba de los conectores sueltos (el radar usa radar_sin_verificar.csv)
 data/mvp_*.csv
+
+# docs internos: notas de estrategia comercial, no van al repo publico
+docs/decisiones.md
+docs/fuentes-y-adquisicion.md
+docs/grandes-flotas.md
+docs/inventario-fuentes-completo.md
+docs/portales-municipales.md
+docs/blueprint-referencia.md

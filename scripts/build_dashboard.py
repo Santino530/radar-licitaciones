@@ -40,7 +40,9 @@ CATEGORIA_PRODUCTO = [
     ("Baterías", ("bateria", "acumulador")),
     ("Protectores", ("protector",)),
 ]
-DIAS_NUEVA = 7  # una deteccion de los ultimos N dias se marca "nueva"
+DIAS_NUEVA = 7            # una deteccion de los ultimos N dias se marca "nueva"
+DIAS_SIBOM_VIGENTE = 45   # SIBOM sin fecha de apertura: vigente hasta N dias de publicada
+GRACIA_APERTURA = 1       # dias despues de la apertura antes de darla por cerrada
 
 
 def productos_de(keywords):
@@ -75,12 +77,6 @@ def cargar_radar(contactos=None):
         for r in csv.DictReader(f):
             es_ruido = (r.get("es_ruido") or "").strip().lower() == "si"
             estado = (r.get("estado") or "").strip().lower()
-            if es_ruido:
-                grupo = "ruido"
-            elif estado in ("adjudicada", "cerrada"):
-                grupo = "cerrada"
-            else:
-                grupo = "abierta"
 
             pub_iso, pub_label = parse_fecha(r.get("fecha_publicacion"))
             ap_iso, ap_label = parse_fecha(r.get("fecha_apertura"))
@@ -91,6 +87,30 @@ def cargar_radar(contactos=None):
                     dias_apertura = (dt.date.fromisoformat(ap_iso) - hoy).days
                 except ValueError:
                     dias_apertura = None
+
+            dias_pub = None
+            if pub_iso:
+                try:
+                    dias_pub = (hoy - dt.date.fromisoformat(pub_iso)).days
+                except ValueError:
+                    dias_pub = None
+
+            # 3 grupos para las pestañas: vigente / cerrada / ruido.
+            # "cierre" explica POR QUE una cerrada esta cerrada (para el cartel).
+            cierre = ""
+            if es_ruido:
+                grupo = "ruido"
+            elif estado in ("adjudicada", "cerrada"):
+                grupo = "cerrada"
+            elif dias_apertura is not None and dias_apertura < -GRACIA_APERTURA:
+                grupo, cierre = "cerrada", "apertura_pasada"
+            elif ap_iso is None and dias_pub is not None and dias_pub > DIAS_SIBOM_VIGENTE:
+                grupo, cierre = "cerrada", "vencida_estimada"
+            else:
+                grupo = "vigente"
+
+            por_vencer = (grupo == "vigente" and dias_apertura is not None
+                          and 0 <= dias_apertura <= 21)
 
             fragmento = (r.get("fragmento") or "").strip()
             objeto = (r.get("objeto") or "").strip()
@@ -125,6 +145,8 @@ def cargar_radar(contactos=None):
                 "id_origen": id_origen,
                 "estado": estado,
                 "grupo": grupo,
+                "cierre": cierre,
+                "por_vencer": por_vencer,
                 "zona": (r.get("categoria_zona") or "").strip(),
                 "keywords": kws,
                 "productos": productos_de(kws),
@@ -143,17 +165,21 @@ def cargar_radar(contactos=None):
 
 
 def ordenar(filas):
-    def clave_abierta(x):
-        sin_fecha = x["fecha_ap_iso"] == ""
-        return (sin_fecha, x["fecha_ap_iso"] or "9999-99-99",
+    def clave_vigente(x):
+        # por vencer primero (por fecha de apertura), despues nuevas, despues por
+        # publicacion mas reciente
+        return (not x["por_vencer"],
+                x["fecha_ap_iso"] or "9999-99-99",
+                not x["nueva"],
                 _neg(x["fecha_pub_iso"]))
 
-    abiertas = sorted((f for f in filas if f["grupo"] == "abierta"), key=clave_abierta)
-    cerradas = sorted((f for f in filas if f["grupo"] == "cerrada"),
-                      key=lambda x: x["fecha_pub_iso"], reverse=True)
-    ruido = sorted((f for f in filas if f["grupo"] == "ruido"),
-                   key=lambda x: x["fecha_pub_iso"], reverse=True)
-    return abiertas + cerradas + ruido
+    vig = sorted((f for f in filas if f["grupo"] == "vigente"), key=clave_vigente)
+    cer = sorted((f for f in filas if f["grupo"] == "cerrada"),
+                 key=lambda x: (x["fecha_ap_iso"] or x["fecha_pub_iso"] or ""),
+                 reverse=True)
+    rui = sorted((f for f in filas if f["grupo"] == "ruido"),
+                 key=lambda x: x["fecha_pub_iso"], reverse=True)
+    return vig + cer + rui
 
 
 def _neg(iso):
@@ -235,20 +261,18 @@ def buscar_contacto(comprador, fuente, contactos):
 def construir_meta(filas):
     corridas = [f["corrida"] for f in filas if f["corrida"]]
     ultima = max(corridas) if corridas else ""
-    abiertas = [f for f in filas if f["grupo"] == "abierta"]
-    por_vencer = [f for f in abiertas
-                  if f["dias_apertura"] is not None and 0 <= f["dias_apertura"] <= 21]
+    vigentes = [f for f in filas if f["grupo"] == "vigente"]
     return {
         "generado": dt.datetime.now().strftime("%Y-%m-%d %H:%M"),
         "ultima_corrida": ultima,
-        "total": len(filas),
-        "abiertas": len(abiertas),
-        "por_vencer": len(por_vencer),
-        "nuevas": sum(1 for f in filas if f["nueva"] and f["grupo"] != "ruido"),
+        "vigentes": len(vigentes),
+        "por_vencer": sum(1 for f in vigentes if f["por_vencer"]),
+        "nuevas": sum(1 for f in vigentes if f["nueva"]),
         "cerradas": sum(1 for f in filas if f["grupo"] == "cerrada"),
         "ruido": sum(1 for f in filas if f["grupo"] == "ruido"),
         "fuentes": sorted({f["fuente"] for f in filas if f["fuente"]}),
         "dias_nueva": DIAS_NUEVA,
+        "dias_sibom": DIAS_SIBOM_VIGENTE,
     }
 
 
@@ -279,8 +303,9 @@ def main():
         f.write(render(filas, proveedores, meta))
 
     print(f"Panel generado: {args.out}")
-    print(f"  {meta['abiertas']} abiertas · {meta['por_vencer']} por vencer · "
-          f"{meta['cerradas']} adjudicadas/cerradas · {meta['ruido']} descartadas")
+    print(f"  {meta['vigentes']} vigentes ({meta['por_vencer']} por vencer, "
+          f"{meta['nuevas']} nuevas) · {meta['cerradas']} cerradas/adjudicadas · "
+          f"{meta['ruido']} descartadas")
     print(f"  ultima corrida del motor: {meta['ultima_corrida'] or 's/d'}")
 
 
@@ -420,11 +445,24 @@ PLANTILLA = r"""<title>Licitaciones de Neumáticos</title>
   }
   .controls input[type="search"] { flex: 1 1 220px; min-width: 0; }
   .controls select { flex: 0 0 auto; }
-  .toggle {
-    display: inline-flex; align-items: center; gap: 7px;
-    font-size: 13px; color: var(--ink-soft); cursor: pointer; user-select: none;
+  .tabs {
+    display: flex; flex-wrap: wrap; gap: 2px; margin-bottom: 22px;
+    border-bottom: 2px solid var(--line);
   }
-  .toggle input { accent-color: var(--accent); width: 15px; height: 15px; }
+  .tab {
+    appearance: none; cursor: pointer; background: none; border: 0;
+    border-bottom: 2px solid transparent; margin-bottom: -2px;
+    font-family: "Libre Franklin", sans-serif; font-weight: 600; font-size: 14px;
+    color: var(--ink-soft); padding: 9px 14px;
+    transition: color 120ms ease, border-color 120ms ease;
+  }
+  .tab:hover { color: var(--ink); }
+  .tab[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); }
+  .tab__n {
+    font-family: "IBM Plex Mono", monospace; font-weight: 500; font-size: 11px;
+    color: var(--ink-soft); margin-left: 5px;
+  }
+  .tab[aria-selected="true"] .tab__n { color: var(--accent); }
 
   .section { margin-bottom: 34px; }
   .section__head {
@@ -647,9 +685,6 @@ PLANTILLA = r"""<title>Licitaciones de Neumáticos</title>
       <option value="volumen_alto">Volumen alto (interior)</option>
       <option value="fuera">Fuera de zona</option>
     </select>
-    <label class="toggle">
-      <input type="checkbox" id="verRuido"> Mostrar descartadas por el filtro
-    </label>
   </div>
 
   <details class="legend">
@@ -657,13 +692,19 @@ PLANTILLA = r"""<title>Licitaciones de Neumáticos</title>
     <div class="legend__body">
       <span><b>Tocá el nombre del comprador</b> en cualquier tarjeta para desplegar el detalle completo del pliego y el contacto.</span>
       <span><span class="legend__dot" style="background:var(--accent)"></span><b>Nueva</b> — el motor la detectó en los últimos 7 días. Es lo que hay que mirar primero.</span>
-      <span><span class="legend__dot" style="background:var(--open)"></span><b>Abierta</b> — llamado vigente, se puede presentar oferta.</span>
+      <span><span class="legend__dot" style="background:var(--open)"></span><b>Vigente</b> — llamado abierto, se puede presentar oferta.</span>
       <span><span class="legend__dot" style="background:var(--soon)"></span><b>Por vencer</b> — la apertura de sobres es en 21 días o menos.</span>
-      <span><span class="legend__dot" style="background:var(--closed)"></span><b>Adjudicada / cerrada</b> — ya no se puede ofertar; sirve para ver competencia.</span>
+      <span><span class="legend__dot" style="background:var(--closed)"></span><b>Cerrada</b> — adjudicada, sin efecto, o ya venció el plazo. Pasa sola a la pestaña "Cerradas". Sirve de comparación (quién compra, quién gana, a qué precio).</span>
       <span><span class="legend__dot" style="background:var(--noise)"></span><b>Descartada</b> — el filtro la marcó como falso positivo (cámara de video, batería de generador, recapado de asfalto…).</span>
-      <span>Los datos vienen sin verificar. Antes de presentarse, siempre abrir el pliego en la fuente oficial.</span>
+      <span>Las licitaciones caducan solas: cuando pasa la apertura (o, si no hay fecha, a los 45 días de publicadas) dejan de aparecer en "Vigentes". Los datos vienen sin verificar: antes de presentarse, abrir siempre el pliego en la fuente oficial.</span>
     </div>
   </details>
+
+  <div class="tabs" id="tabs" role="tablist">
+    <button class="tab" data-tab="vigentes" role="tab" aria-selected="true">Vigentes y por vencer<span class="tab__n" id="tabn-vigentes"></span></button>
+    <button class="tab" data-tab="cerradas" role="tab" aria-selected="false">Cerradas / adjudicadas<span class="tab__n" id="tabn-cerradas"></span></button>
+    <button class="tab" data-tab="ruido" role="tab" aria-selected="false">Descartadas<span class="tab__n" id="tabn-ruido"></span></button>
+  </div>
 
   <main id="lista"></main>
 
@@ -696,7 +737,17 @@ PLANTILLA = r"""<title>Licitaciones de Neumáticos</title>
   };
   var FUENTE_LABEL = { sibom: "SIBOM", pbac: "PBAC", bac: "BAC · CABA" };
 
-  var state = { q: "", zona: "", producto: "", verRuido: false, tile: "" };
+  var GRUPO_DE_TAB = { vigentes: "vigente", cerradas: "cerrada", ruido: "ruido" };
+
+  function leerTab() {
+    try {
+      var t = localStorage.getItem("radar-tab");
+      return GRUPO_DE_TAB[t] ? t : "vigentes";
+    } catch (e) { return "vigentes"; }
+  }
+
+  // tab: pestaña activa · sub: filtro rapido dentro de "vigentes" ("" | "porvencer" | "nuevas")
+  var state = { q: "", zona: "", producto: "", tab: leerTab(), sub: "" };
 
   // --- Tema (claro / oscuro / auto), recordado por navegador -----------------
   var TEMAS = ["auto", "light", "dark"];
@@ -723,21 +774,24 @@ PLANTILLA = r"""<title>Licitaciones de Neumáticos</title>
   function pill(row) {
     if (row.grupo === "ruido") return { cls: "noise", txt: "Ruido" };
     if (row.grupo === "cerrada") {
-      return { cls: "closed", txt: row.estado === "cerrada" ? "Cerrada" : "Adjudicada" };
+      if (row.estado === "adjudicada") return { cls: "closed", txt: "Adjudicada" };
+      if (row.estado === "cerrada") return { cls: "closed", txt: "Cerrada" };
+      if (row.cierre === "apertura_pasada") return { cls: "closed", txt: "Apertura pasó" };
+      if (row.cierre === "vencida_estimada") return { cls: "closed", txt: "Vencida (est.)" };
+      return { cls: "closed", txt: "Cerrada" };
     }
     var d = row.dias_apertura;
     if (d != null && d >= 0 && d <= 7) return { cls: "soon", txt: "Vence en " + d + " día" + (d === 1 ? "" : "s") };
     if (d != null && d > 7 && d <= 21) return { cls: "soon", txt: "Apertura en " + d + " días" };
-    if (d != null && d < 0) return { cls: "closed", txt: "Apertura pasó" };
-    return { cls: "open", txt: "Abierta" };
+    return { cls: "open", txt: "Vigente" };
   }
 
   function cardClass(row, p) {
     var c = "card";
     if (row.grupo === "ruido") c += " card--noise";
     else if (p.cls === "soon") c += " card--soon";
-    else if (row.grupo === "abierta") c += " card--open";
-    if (row.nueva && row.grupo !== "ruido") c += " card--flag";
+    else if (row.grupo === "vigente") c += " card--open";
+    if (row.nueva && row.grupo === "vigente") c += " card--flag";
     return c;
   }
 
@@ -788,7 +842,10 @@ PLANTILLA = r"""<title>Licitaciones de Neumáticos</title>
     d += detFila("N° de proceso / expediente", esc(row.id_origen));
     d += detFila("Fuente", esc(FUENTE_LABEL[row.fuente] || row.fuente));
     d += detFila("Estado", esc(row.estado) ||
-      (row.grupo === "abierta" ? "abierta (sin confirmar)" : ""));
+      (row.grupo === "vigente" ? "vigente (sin confirmar)"
+       : row.cierre === "apertura_pasada" ? "cerrada — la apertura de sobres ya pasó"
+       : row.cierre === "vencida_estimada" ? "cerrada — estimado por antigüedad (sin fecha de apertura publicada)"
+       : ""));
     d += detFila("Zona", esc(ZONA_LABEL[row.zona] || ""));
     d += detFila("Productos", esc((row.productos || []).join(", ")));
     d += detFila("Palabras clave que la detectaron", esc((row.keywords || []).join(", ")));
@@ -824,7 +881,7 @@ PLANTILLA = r"""<title>Licitaciones de Neumáticos</title>
     var link = row.url
       ? '<a class="card__link" href="' + esc(row.url) + '" target="_blank" rel="noopener">Ver en la fuente ↗</a>'
       : "";
-    var nueva = (row.nueva && row.grupo !== "ruido")
+    var nueva = (row.nueva && row.grupo === "vigente")
       ? '<span class="pill pill--nueva">Nueva</span> ' : "";
 
     return '' +
@@ -843,7 +900,7 @@ PLANTILLA = r"""<title>Licitaciones de Neumáticos</title>
       "</article>";
   }
 
-  function pasaFiltro(row) {
+  function pasaBusqueda(row) {
     if (state.zona && row.zona !== state.zona) return false;
     if (state.producto && (row.productos || []).indexOf(state.producto) === -1) return false;
     if (state.q) {
@@ -851,69 +908,79 @@ PLANTILLA = r"""<title>Licitaciones de Neumáticos</title>
                  (row.keywords || []).join(" ")).toLowerCase();
       if (hay.indexOf(state.q.toLowerCase()) === -1) return false;
     }
-    if (state.tile === "abiertas" && row.grupo !== "abierta") return false;
-    if (state.tile === "nuevas" && !(row.nueva && row.grupo !== "ruido")) return false;
-    if (state.tile === "porvencer") {
-      if (row.grupo !== "abierta") return false;
-      var d = row.dias_apertura;
-      if (d == null || d < 0 || d > 21) return false;
-    }
-    if (state.tile === "cerradas" && row.grupo !== "cerrada") return false;
-    if (state.tile === "ruido" && row.grupo !== "ruido") return false;
     return true;
   }
 
-  function nuevasPrimero(a, b) {
-    return (a.nueva ? 0 : 1) - (b.nueva ? 0 : 1);
-  }
-
-  function seccion(titulo, nota, filas) {
-    var body = filas.length
-      ? '<div class="cards">' + filas.map(renderCard).join("") + "</div>"
-      : '<div class="empty">Nada por acá en esta corrida.</div>';
-    return '<section class="section">' +
-      '<div class="section__head"><h2 class="section__title">' + esc(titulo) +
-      '</h2><span class="section__count">' + filas.length + "</span></div>" +
-      (nota ? '<p class="section__note">' + esc(nota) + "</p>" : "") +
-      body + "</section>";
-  }
+  var NOTA_TAB = {
+    vigentes: "Llamados abiertos. Los que están por vencer (apertura en ≤21 días) y las " +
+      "detecciones nuevas van primero. Cuando pasa la apertura, la licitación se mueve sola " +
+      "a la pestaña “Cerradas”.",
+    cerradas: "Ya no se puede ofertar (adjudicadas, sin efecto, o venció el plazo). Quedan " +
+      "acá de comparación: quién compra, quién gana y a qué precio.",
+    ruido: "Falsos positivos que el filtro descartó (cámara de video, batería de generador, " +
+      "recapado asfáltico de calzada, etc.). A la vista para poder auditarlos."
+  };
 
   function render() {
-    var vis = RADAR.filter(pasaFiltro);
-    var abiertas = vis.filter(function (r) { return r.grupo === "abierta"; }).slice().sort(nuevasPrimero);
-    var cerradas = vis.filter(function (r) { return r.grupo === "cerrada"; });
-    var ruido = vis.filter(function (r) { return r.grupo === "ruido"; });
+    var grupo = GRUPO_DE_TAB[state.tab] || "vigente";
+    var rows = RADAR.filter(function (r) { return r.grupo === grupo && pasaBusqueda(r); });
+    if (state.tab === "vigentes" && state.sub === "porvencer")
+      rows = rows.filter(function (r) { return r.por_vencer; });
+    if (state.tab === "vigentes" && state.sub === "nuevas")
+      rows = rows.filter(function (r) { return r.nueva; });
 
-    var html = seccion("Oportunidades abiertas",
-      "Las nuevas (detectadas en los últimos " + META.dias_nueva + " días) van primero; " +
-      "después, por fecha de apertura más próxima.", abiertas);
-    html += seccion("Adjudicadas y cerradas",
-      "No son oportunidades para presentarse. Sirven para saber quién compra y quién gana.",
-      cerradas);
-    if (state.verRuido || state.tile === "ruido") {
-      html += seccion("Descartadas por el filtro de ruido",
-        "El radar las marcó como falsos positivos (cámara de video, batería de generador, " +
-        "recapado asfáltico de calzada, etc.). Quedan a la vista para poder auditarlas.",
-        ruido);
-    }
-    document.getElementById("lista").innerHTML = html;
+    var subTxt = state.sub === "porvencer" ? " · filtrando: por vencer"
+      : state.sub === "nuevas" ? " · filtrando: nuevas" : "";
+    var body = rows.length
+      ? '<div class="cards">' + rows.map(renderCard).join("") + "</div>"
+      : '<div class="empty">Nada por acá en esta corrida.</div>';
+    document.getElementById("lista").innerHTML =
+      '<section class="section">' +
+      '<p class="section__note">' + esc(NOTA_TAB[state.tab] + subTxt) + "</p>" +
+      body + "</section>";
+
+    ["vigentes", "cerradas", "ruido"].forEach(function (t) {
+      var el = document.querySelector('.tab[data-tab="' + t + '"]');
+      if (el) el.setAttribute("aria-selected", String(t === state.tab));
+    });
+  }
+
+  // cada tile lleva a una pestaña (y opcionalmente a un sub-filtro dentro de "vigentes")
+  var TILES = [
+    { id: "vigentes", tab: "vigentes", sub: "", l: "Vigentes", mod: "open", n: "vigentes" },
+    { id: "porvencer", tab: "vigentes", sub: "porvencer", l: "Por vencer (≤21 d)", mod: "soon", n: "por_vencer" },
+    { id: "nuevas", tab: "vigentes", sub: "nuevas", l: "Nuevas (" + META.dias_nueva + " d)", mod: "nueva", n: "nuevas" },
+    { id: "cerradas", tab: "cerradas", sub: "", l: "Cerradas", n: "cerradas" },
+    { id: "ruido", tab: "ruido", sub: "", l: "Descartadas", n: "ruido" }
+  ];
+
+  function tileActivo(t) {
+    return state.tab === t.tab && (t.tab !== "vigentes" || state.sub === t.sub);
   }
 
   function renderResumen() {
-    var tiles = [
-      { k: "", n: META.total, l: "En el radar" },
-      { k: "nuevas", n: META.nuevas, l: "Nuevas (" + META.dias_nueva + " d)", mod: "nueva" },
-      { k: "abiertas", n: META.abiertas, l: "Abiertas", mod: "open" },
-      { k: "porvencer", n: META.por_vencer, l: "Por vencer (≤21 d)", mod: "soon" },
-      { k: "cerradas", n: META.cerradas, l: "Adjudicadas" },
-      { k: "ruido", n: META.ruido, l: "Descartadas" }
-    ];
-    document.getElementById("summary").innerHTML = tiles.map(function (t) {
+    document.getElementById("summary").innerHTML = TILES.map(function (t) {
       return '<button class="tile' + (t.mod ? " tile--" + t.mod : "") +
-        '" data-tile="' + t.k + '" aria-pressed="' + (state.tile === t.k) + '">' +
-        '<span class="tile__n">' + t.n + "</span>" +
+        '" data-tile="' + t.id + '" aria-pressed="' + tileActivo(t) + '">' +
+        '<span class="tile__n">' + META[t.n] + "</span>" +
         '<span class="tile__l">' + esc(t.l) + "</span></button>";
     }).join("");
+  }
+
+  function renderTabCounts() {
+    var c = { vigentes: META.vigentes, cerradas: META.cerradas, ruido: META.ruido };
+    ["vigentes", "cerradas", "ruido"].forEach(function (t) {
+      var el = document.getElementById("tabn-" + t);
+      if (el) el.textContent = c[t];
+    });
+  }
+
+  function irA(tab, sub) {
+    state.tab = tab;
+    state.sub = tab === "vigentes" ? (sub || "") : "";
+    try { localStorage.setItem("radar-tab", tab); } catch (e) {}
+    renderResumen();
+    render();
   }
 
   function renderMeta() {
@@ -956,15 +1023,18 @@ PLANTILLA = r"""<title>Licitaciones de Neumáticos</title>
   document.getElementById("zona").addEventListener("change", function (e) {
     state.zona = e.target.value; render();
   });
-  document.getElementById("verRuido").addEventListener("change", function (e) {
-    state.verRuido = e.target.checked; render();
+  document.getElementById("tabs").addEventListener("click", function (e) {
+    var b = e.target.closest(".tab"); if (!b) return;
+    irA(b.getAttribute("data-tab"), "");
   });
   document.getElementById("summary").addEventListener("click", function (e) {
     var b = e.target.closest(".tile"); if (!b) return;
-    var k = b.getAttribute("data-tile");
-    state.tile = (state.tile === k) ? "" : k;
-    if (state.tile === "ruido") document.getElementById("verRuido").checked = state.verRuido = true;
-    renderResumen(); render();
+    var t = null, id = b.getAttribute("data-tile");
+    for (var i = 0; i < TILES.length; i++) if (TILES[i].id === id) t = TILES[i];
+    if (!t) return;
+    // segundo clic sobre un tile de sub-filtro ya activo -> lo saca
+    if (tileActivo(t) && t.sub) irA("vigentes", "");
+    else irA(t.tab, t.sub);
   });
   document.getElementById("lista").addEventListener("click", function (e) {
     var head = e.target.closest(".card__head"); if (!head) return;
@@ -983,6 +1053,7 @@ PLANTILLA = r"""<title>Licitaciones de Neumáticos</title>
 
   aplicarTema(leerTema());
   renderMeta();
+  renderTabCounts();
   renderResumen();
   renderProveedores();
   render();

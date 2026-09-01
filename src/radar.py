@@ -27,6 +27,7 @@ import argparse
 import csv
 import datetime as dt
 import os
+import re
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -127,6 +128,50 @@ def cargar_previo():
         return {(row["fuente"], row["id_origen"]): row for row in csv.DictReader(f)}
 
 
+_FECHA_RE = re.compile(r"(\d{2})/(\d{2})/(\d{4})")
+
+
+def _fecha(s):
+    m = _FECHA_RE.search(s or "")
+    if not m:
+        return None
+    d, mo, y = m.groups()
+    try:
+        return dt.date(int(y), int(mo), int(d))
+    except ValueError:
+        return None
+
+
+# Cuanto tiempo se conserva cada tipo de fila en el CSV antes de borrarla sola.
+VIDA_RUIDO_DIAS = 30       # el ruido se guarda un mes para poder auditarlo
+VIDA_CERRADA_DIAS = 365    # adjudicadas/cerradas: ~1 año como comparativa
+GRACIA_APERTURA_DIAS = 30  # con fecha de apertura: se borra 30 dias despues
+VIDA_SIBOM_ABIERTA = 90    # SIBOM sin fecha de apertura: se borra a los 90 dias de publicada
+
+
+def esta_muerta(row, hoy):
+    """True si la licitacion ya no sirve para nada (terminada y vieja) y hay que
+    sacarla del CSV. El panel ademas la oculta antes de que llegue a este punto."""
+    es_ruido = (row.get("es_ruido") or "").strip().lower() == "si"
+    estado = (row.get("estado") or "").strip().lower()
+    try:
+        dias_visto = (hoy - dt.date.fromisoformat(row.get("primera_vez_visto") or "")).days
+    except ValueError:
+        dias_visto = 0
+
+    if es_ruido:
+        return dias_visto > VIDA_RUIDO_DIAS
+    if estado in ("adjudicada", "cerrada"):
+        return dias_visto > VIDA_CERRADA_DIAS
+    ap = _fecha(row.get("fecha_apertura"))
+    if ap is not None:
+        return (hoy - ap).days > GRACIA_APERTURA_DIAS
+    pub = _fecha(row.get("fecha_publicacion"))
+    if pub is not None:
+        return (hoy - pub).days > VIDA_SIBOM_ABIERTA
+    return False
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--incluir-ruido", action="store_true")
@@ -171,6 +216,12 @@ def main():
         reclasificar(row)
 
     todas = nuevas + siguen + solo_antes
+
+    # Vencimiento automatico: sacar del CSV lo que ya termino y quedo viejo.
+    hoy_d = dt.date.today()
+    vivas = [r for r in todas if not esta_muerta(r, hoy_d)]
+    caducadas = len(todas) - len(vivas)
+    todas = vivas
     todas.sort(key=lambda r: (r.get("primera_vez_visto", ""), r.get("fuente", "")),
                reverse=True)
 
@@ -184,6 +235,8 @@ def main():
     print(f"\n=== RESUMEN corrida {hoy} ===")
     print(f"  {len(encontrados)} licitaciones activas encontradas hoy")
     print(f"  {len(nuevas)} NUEVAS respecto de la corrida anterior")
+    if caducadas:
+        print(f"  {caducadas} caducadas (sacadas del CSV por vencimiento)")
     print(f"  {len(todas)} filas totales en {os.path.basename(CSV_RADAR)}")
     if nuevas:
         print("\n  --- NUEVAS APERTURAS ---")

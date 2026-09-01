@@ -47,7 +47,14 @@ jobs:
             echo "Sin cambios en el radar."
           else
             git commit -m "Radar: corrida $(date -u +'%Y-%m-%d %H:%M UTC')"
-            git push
+            # si alguien pusheo mientras corria (backfill, sesion interactiva),
+            # reintenta con rebase antes de rendirse.
+            for intento in 1 2 3; do
+              if git push; then break; fi
+              echo "push rechazado, intento $intento: pull --rebase y reintento"
+              git pull --rebase origin main
+              sleep 5
+            done
           fi
 
       # docs/index.html se sirve como GitHub Pages -> link publico que se

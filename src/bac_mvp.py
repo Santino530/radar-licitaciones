@@ -108,31 +108,36 @@ def _campo(html, nombre):
     return m.group(1) if m else ""
 
 
-def descargar_reporte_xlsx(intentos=5):
+def descargar_reporte_xlsx(intentos=6):
     s = Session()
     s.arrancar()
 
     for i in range(1, intentos + 1):
-        html = s.get({"Referer": BASE + "/Default.aspx"}).decode("utf-8", "replace")
-        if "btnDescargarReporteExcel" not in html:
-            print(f"   intento {i}: pagina sin boton de export, reintento ...",
-                  file=sys.stderr)
-            time.sleep(2)
-            continue
+        try:
+            html = s.get({"Referer": BASE + "/Default.aspx"}).decode("utf-8", "replace")
+            if "btnDescargarReporteExcel" not in html:
+                print(f"   intento {i}: pagina sin boton de export, reintento ...",
+                      file=sys.stderr)
+                time.sleep(3 * i)
+                continue
 
-        form = {
-            "__EVENTTARGET": "ctl00$CPH1$btnDescargarReporteExcel",
-            "__EVENTARGUMENT": "",
-            "__VIEWSTATE": _campo(html, "__VIEWSTATE"),
-            "__VIEWSTATEGENERATOR": _campo(html, "__VIEWSTATEGENERATOR"),
-            "ctl00$CSRFToken": _campo(html, "ctl00$CSRFToken"),
-            "ctl00$CtrlMenuPortal$hdnLogin": _campo(html, "ctl00$CtrlMenuPortal$hdnLogin"),
-        }
-        body = s.post(urllib.parse.urlencode(form).encode(), {"Referer": URL})
-        if body[:2] == b"PK":  # es un .xlsx
-            return body
-        print(f"   intento {i}: el server devolvio HTML, reintento ...", file=sys.stderr)
-        time.sleep(2)
+            form = {
+                "__EVENTTARGET": "ctl00$CPH1$btnDescargarReporteExcel",
+                "__EVENTARGUMENT": "",
+                "__VIEWSTATE": _campo(html, "__VIEWSTATE"),
+                "__VIEWSTATEGENERATOR": _campo(html, "__VIEWSTATEGENERATOR"),
+                "ctl00$CSRFToken": _campo(html, "ctl00$CSRFToken"),
+                "ctl00$CtrlMenuPortal$hdnLogin": _campo(html, "ctl00$CtrlMenuPortal$hdnLogin"),
+            }
+            body = s.post(urllib.parse.urlencode(form).encode(), {"Referer": URL})
+            if body[:2] == b"PK":  # es un .xlsx
+                return body
+            print(f"   intento {i}: el server devolvio HTML, reintento ...", file=sys.stderr)
+        except Exception as e:  # noqa: BLE001  (server lento/inestable; timeouts frecuentes)
+            print(f"   intento {i}: error de red ({e}), reintento ...", file=sys.stderr)
+            s = Session()
+            s.arrancar()
+        time.sleep(3 * i)
     raise RuntimeError("BAC no devolvio el Excel despues de varios intentos")
 
 

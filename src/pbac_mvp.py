@@ -113,29 +113,33 @@ class Session:
         return r
 
 
-def descargar_reporte_xlsx(intentos=5):
+def descargar_reporte_xlsx(intentos=6):
     s = Session()
     for i in range(1, intentos + 1):
-        html = s.open().read().decode("utf-8", "replace")
+        try:
+            html = s.open().read().decode("utf-8", "replace")
 
-        def field(n):
-            m = (re.search(r'name="%s"[^>]*value="([^"]*)"' % re.escape(n), html)
-                 or re.search(r'id="%s"[^>]*value="([^"]*)"' % re.escape(n), html))
-            return m.group(1) if m else ""
+            def field(n):
+                m = (re.search(r'name="%s"[^>]*value="([^"]*)"' % re.escape(n), html)
+                     or re.search(r'id="%s"[^>]*value="([^"]*)"' % re.escape(n), html))
+                return m.group(1) if m else ""
 
-        form = {
-            "__EVENTTARGET": "ctl00$CPH1$btnDescargarReporteExcel",
-            "__EVENTARGUMENT": "",
-            "__VIEWSTATE": field("__VIEWSTATE"),
-            "__VIEWSTATEGENERATOR": field("__VIEWSTATEGENERATOR"),
-            "ctl00$CtrlMenuPortal$hdnLogin": field("ctl00$CtrlMenuPortal$hdnLogin"),
-        }
-        r = s.open(urllib.parse.urlencode(form).encode(), {"Referer": URL})
-        body = r.read()
-        if body[:2] == b"PK":  # es un .xlsx
-            return body
-        print(f"   intento {i}: el server devolvio HTML, reintento ...", file=sys.stderr)
-        time.sleep(2)
+            form = {
+                "__EVENTTARGET": "ctl00$CPH1$btnDescargarReporteExcel",
+                "__EVENTARGUMENT": "",
+                "__VIEWSTATE": field("__VIEWSTATE"),
+                "__VIEWSTATEGENERATOR": field("__VIEWSTATEGENERATOR"),
+                "ctl00$CtrlMenuPortal$hdnLogin": field("ctl00$CtrlMenuPortal$hdnLogin"),
+            }
+            r = s.open(urllib.parse.urlencode(form).encode(), {"Referer": URL})
+            body = r.read()
+            if body[:2] == b"PK":  # es un .xlsx
+                return body
+            print(f"   intento {i}: el server devolvio HTML, reintento ...", file=sys.stderr)
+        except Exception as e:  # noqa: BLE001  (server lento/inestable; timeouts frecuentes)
+            print(f"   intento {i}: error de red ({e}), reintento ...", file=sys.stderr)
+            s = Session()  # sesion nueva por las dudas
+        time.sleep(3 * i)
     raise RuntimeError("PBAC no devolvio el Excel despues de varios intentos")
 
 

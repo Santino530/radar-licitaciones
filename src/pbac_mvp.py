@@ -58,6 +58,7 @@ RUIDO_PATRONES = [
     "de desuso", "fuera de uso", "nfu", "reciclad",        # residuos
     "camara de video", "camara ip", "camara de seg", "camara frigor",
     "camara de frio", "camara gesell", "camara digital", "camara fotograf",
+    "camara de foto", "camara web", "camara termografica", "camara de television",
     "camara de conservacion", "mantenimiento y reparacion de camara",  # camaras de frio de hospitales
     "camara de flujo", "camara de bioseguridad", "camara hiperbarica",
     "camara de seguridad", "camaras de seguridad", "camara de vigilancia",
@@ -80,6 +81,11 @@ RUIDO_PATRONES = [
     "grupo electrogeno", "grupo generador", "para generador",   # baterias de generador
     "transceptor", "transceptores", "equipos telefonicos",      # baterias de radio / handy
     "intrinsecamente seguro",
+    # "neumatico" / "cubierta" que NO es de rueda
+    "bote neumatico", "botes neumaticos", "balsa neumatica", "balsa inflable",
+    "bote inflable", "gomon", "gomones", "semirrigido", "zodiac",   # embarcaciones
+    "cubierta de techo", "cubierta metalica", "cubierta de chapa",
+    "cubierta vegetal", "cubierta cenital",                        # techos / superficies
 ]
 
 

@@ -14,6 +14,7 @@ data/sheet.html
 # dumps crudos opcionales de los conectores de compras
 data/pbac_ReporteProcesos.xlsx
 data/bac_ReporteProcesos.xlsx
+data/comprar_ReporteProcesos.xlsx
 
 # salidas de prueba de los conectores sueltos (el radar usa radar_sin_verificar.csv)
 data/mvp_*.csv

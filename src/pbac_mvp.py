@@ -67,7 +67,7 @@ RUIDO_PATRONES = [
     "camara de bombeo", "camara transformadora", "camara reductora",
     "camara de aire acondicionado",
     # "protector" que NO es de neumatico (mayormente EPP / salud, y PBAC es hospital-heavy)
-    "protector facial", "protector ocular", "protector bucal", "protector auditivo",
+    "protector facial", "protectores faciales", "protector ocular", "protector bucal", "protector auditivo",
     "protector solar", "protector labial", "protector de colchon",
     "protector de pantalla", "protector gastrico", "protector plomado",
     "protector radiologico", "protector dental", "protector de calzado",

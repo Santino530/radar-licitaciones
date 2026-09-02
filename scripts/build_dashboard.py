@@ -121,7 +121,7 @@ def cargar_radar(contactos=None):
             # referencia secundaria: si el texto principal es el fragmento, mostramos
             # el "objeto" (la cita del boletin / el nro de proceso) como referencia.
             ref = objeto if fragmento else ""
-            if not ref and fuente in ("pbac", "bac", "comprar"):
+            if not ref and fuente in ("pbac", "bac", "comprar", "corredores"):
                 ref = f"Proceso {id_origen}"
 
             kws = [k.strip() for k in (r.get("keywords") or "").split(",") if k.strip()]
@@ -240,19 +240,19 @@ def cargar_contactos():
 
 def buscar_contacto(comprador, fuente, contactos):
     """SIBOM: el 'comprador' ES el municipio -> se busca su oficina de compras.
-    PBAC / BAC / COMPR.AR: el 'comprador' es una unidad ejecutora (hospital,
-    ministerio...) -> se usa el contacto general del portal, NO se intenta
-    adivinar por el nombre."""
+    PBAC / BAC / COMPR.AR / Corredores Viales: el 'comprador' es una unidad
+    ejecutora (hospital, ministerio, la propia empresa...) -> se usa el contacto
+    general del portal, NO se intenta adivinar por el nombre."""
     if not contactos:
         return None
-    if fuente in ("pbac", "bac", "comprar"):
+    if fuente in ("pbac", "bac", "comprar", "corredores"):
         return contactos.get(fuente)
     k = _clave_comprador(comprador)
     if k in contactos:
         return contactos[k]
     # match parcial solo para SIBOM (nombre de municipio con/sin acento, "de", etc.)
     for ck, cv in contactos.items():
-        if ck in ("pbac", "bac", "comprar"):
+        if ck in ("pbac", "bac", "comprar", "corredores"):
             continue
         if ck and (ck in k or k in ck) and len(ck) > 4:
             return cv
@@ -984,7 +984,7 @@ PLANTILLA = r"""<title>Licitaciones de Neumáticos</title>
   var ZONA_LABEL = {
     objetivo: "Zona objetivo", volumen_alto: "Volumen alto", fuera: "Fuera de zona"
   };
-  var FUENTE_LABEL = { sibom: "SIBOM", pbac: "PBAC", bac: "BAC · CABA", comprar: "COMPR.AR · Nación" };
+  var FUENTE_LABEL = { sibom: "SIBOM", pbac: "PBAC", bac: "BAC · CABA", comprar: "COMPR.AR · Nación", corredores: "Corredores Viales" };
 
   var GRUPO_DE_TAB = { vigentes: "vigente", cerradas: "cerrada", ruido: "ruido" };
   var TABS_VALIDAS = { vigentes: 1, cerradas: 1, metricas: 1, ruido: 1 };

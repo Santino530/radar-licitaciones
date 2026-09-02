@@ -48,6 +48,7 @@ CAMPOS_HIST = CAMPOS + ["ultima_vez_visto"]
 sys.path.insert(0, HERE)
 import bac_mvp  # noqa: E402
 import comprar_mvp  # noqa: E402
+import corredores_mvp  # noqa: E402
 import pbac_mvp  # noqa: E402
 import sibom_mvp  # noqa: E402
 
@@ -114,7 +115,14 @@ def de_comprar(incluir_ruido):
         "comprar", "https://comprar.gob.ar/Compras.aspx")
 
 
-CONECTORES = {"sibom": de_sibom, "pbac": de_pbac, "bac": de_bac, "comprar": de_comprar}
+def de_corredores(incluir_ruido):
+    yield from _filas_comprar(
+        corredores_mvp.recolectar(incluir_ruido=incluir_ruido, verbose=True),
+        "corredores", "https://corredoresvialessa.com.ar/licitaciones")
+
+
+CONECTORES = {"sibom": de_sibom, "pbac": de_pbac, "bac": de_bac,
+              "comprar": de_comprar, "corredores": de_corredores}
 
 
 def reclasificar(row):
@@ -128,7 +136,7 @@ def reclasificar(row):
         est = sibom_mvp.detectar_estado(texto)
         if est:
             row["estado"] = est
-    elif row.get("fuente") in ("pbac", "bac", "comprar"):
+    elif row.get("fuente") in ("pbac", "bac", "comprar", "corredores"):
         row["es_ruido"] = "si" if pbac_mvp.es_ruido(texto) else "no"
 
 

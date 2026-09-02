@@ -15,6 +15,7 @@ data/sheet.html
 data/pbac_ReporteProcesos.xlsx
 data/bac_ReporteProcesos.xlsx
 data/comprar_ReporteProcesos.xlsx
+data/corredores_licitaciones.json
 
 # salidas de prueba de los conectores sueltos (el radar usa radar_sin_verificar.csv)
 data/mvp_*.csv

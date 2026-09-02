@@ -6,7 +6,7 @@ organismos del sector estatal argentino (foco AMBA + Provincia de Buenos Aires).
 
 ## Cómo funciona
 
-1. **Motor** (`src/radar.py`) — corre en GitHub Actions 3 veces por día. Consulta cuatro
+1. **Motor** (`src/radar.py`) — corre en GitHub Actions 3 veces por día. Consulta cinco
    fuentes y guarda lo que matchea en `data/radar_sin_verificar.csv`:
    - `src/sibom_mvp.py` — SIBOM, el boletín oficial digital de ~135 municipios de la
      Provincia de Buenos Aires.
@@ -17,6 +17,10 @@ organismos del sector estatal argentino (foco AMBA + Provincia de Buenos Aires).
      nacionales, y empresas del Estado adheridas como AySA). El reporte nacional
      identifica al comprador con un código interno; resolver el nombre del organismo
      es una mejora pendiente.
+   - `src/corredores_mvp.py` — Corredores Viales S.A., la empresa estatal que
+     administra las rutas nacionales concesionadas. Licita por su cuenta (no entra
+     por COMPR.AR) y compra neumáticos y cubiertas para su flota vial. Usa la misma
+     API JSON pública que su web de licitaciones.
 2. **Filtros** — palabras clave del rubro + descarte de falsos positivos (cámara de
    video, batería de generador, recapado asfáltico de calzada, etc.). Cada licitación
    se clasifica en *vigente* / *cerrada* / *descartada* y caduca sola cuando pasa la
@@ -35,6 +39,7 @@ src/
   pbac_mvp.py     conector PBAC
   bac_mvp.py      conector BAC
   comprar_mvp.py  conector COMPR.AR (Nación)
+  corredores_mvp.py  conector Corredores Viales S.A.
 scripts/build_dashboard.py    arma el panel HTML desde los CSV
 data/
   radar_sin_verificar.csv     salida del motor

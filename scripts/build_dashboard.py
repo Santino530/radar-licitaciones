@@ -683,6 +683,33 @@ PLANTILLA = r"""<title>Licitaciones de Neumáticos</title>
     font-size: 12px; font-weight: 500; padding: 6px 11px; border-radius: 7px;
   }
   .detail__note { font-size: 11.5px; color: var(--ink-soft); margin: 10px 0 0; }
+
+  /* aviso "cómo abrir el proceso" (COMPR.AR no permite deep-link) */
+  .copybox {
+    background: var(--surface-2); border: 1px solid var(--line); border-radius: 8px;
+    border-left: 3px solid var(--soon);
+    padding: 11px 13px; font-size: 13px; margin-top: 10px;
+  }
+  .copybox__t {
+    font-family: "Libre Franklin", sans-serif; font-weight: 700; font-size: 12px;
+    text-transform: uppercase; letter-spacing: .03em; color: var(--ink-soft); margin: 0 0 7px;
+  }
+  .copybox ol { margin: 0 0 9px; padding-left: 18px; }
+  .copybox li { margin: 3px 0; }
+  .copybox a { color: var(--accent); }
+  .copybox__num { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .copybox__code {
+    font-family: "IBM Plex Mono", monospace; font-size: 12.5px; font-weight: 500;
+    background: var(--surface); border: 1px solid var(--line); border-radius: 6px;
+    padding: 5px 9px; color: var(--ink); user-select: all; word-break: break-all;
+  }
+  .copybtn {
+    appearance: none; cursor: pointer; font: inherit; font-size: 12px; font-weight: 500;
+    background: var(--accent); color: var(--surface); border: 0; border-radius: 7px;
+    padding: 6px 11px; flex: 0 0 auto;
+  }
+  .copybtn.is-done { background: var(--open); }
+
   @media (max-width: 560px) {
     .detail { grid-template-columns: 1fr; gap: 2px 0; }
     .detail__k { padding-top: 8px; }
@@ -908,7 +935,7 @@ PLANTILLA = r"""<title>Licitaciones de Neumáticos</title>
     <p class="masthead__sub">
       Licitaciones públicas de neumáticos, recapado, llantas, cámaras, baterías de
       vehículo y protectores, en municipios de la Provincia de Buenos Aires, el Estado
-      provincial y la Ciudad de Buenos Aires.
+      provincial, la Ciudad de Buenos Aires y el Estado nacional.
     </p>
     <p class="masthead__meta" id="meta"></p>
   </header>
@@ -963,8 +990,8 @@ PLANTILLA = r"""<title>Licitaciones de Neumáticos</title>
       abrir el pliego en la fuente oficial y confirmar objeto, fechas y condiciones.
     </div>
     <p><b>Qué cubre hoy:</b> <span id="cobertura"></span></p>
-    <p><b>Falta sumar:</b> Nación (COMPR.AR), portales propios de municipios que no
-      publican en SIBOM, y el Boletín Oficial de la Provincia como respaldo.</p>
+    <p><b>Falta sumar:</b> portales propios de municipios que no publican en SIBOM,
+      y el Boletín Oficial de la Provincia como respaldo.</p>
     <p id="pie"></p>
   </footer>
 </div>
@@ -1103,14 +1130,40 @@ PLANTILLA = r"""<title>Licitaciones de Neumáticos</title>
     d += detFila("Apertura de sobres", esc(row.fecha_ap_label));
     d += detFila("Detectada por el radar", esc(row.detectada));
     d += detFila("Vista por última vez", esc(row.corrida));
+    var esComprar = row.fuente === "comprar";
     d += detFila("Pliego", row.url
-      ? '<a href="' + esc(row.url) + '" target="_blank" rel="noopener">Abrir en la fuente oficial ↗</a>'
+      ? '<a href="' + esc(row.url) + '" target="_blank" rel="noopener">' +
+        (esComprar ? "Abrir COMPR.AR (Nación) ↗" : "Abrir en la fuente oficial ↗") + "</a>"
       : "sin link");
     return '<div class="card__detail" hidden>' +
       '<div class="detail">' + d + "</div>" +
+      (esComprar ? avisoComprarHTML(row) : "") +
       contactoHTML(row) +
       '<p class="detail__note">Datos sin verificar. Antes de presentarse, confirmá objeto, ' +
       "fechas y condiciones en el pliego oficial.</p></div>";
+  }
+
+  // COMPR.AR (portal nacional) no expone una URL por proceso: todo pasa por
+  // postbacks de ASP.NET detrás de un querystring cifrado. El link general lleva
+  // al listado; acá dejamos el Nº de proceso listo para pegar en su buscador.
+  function avisoComprarHTML(row) {
+    var nro = (row.id_origen || "").trim();
+    if (!nro) return "";
+    var url = row.url || "https://comprar.gob.ar/";
+    return '<div class="copybox">' +
+      '<p class="copybox__t">Cómo abrir este proceso en COMPR.AR</p>' +
+      '<p style="margin:0 0 8px">COMPR.AR (Nación) no permite un enlace directo a un ' +
+      "proceso. Para llegar a este:</p>" +
+      "<ol>" +
+        '<li>Abrí el <a href="' + esc(url) + '" target="_blank" rel="noopener">' +
+        "buscador de COMPR.AR ↗</a>.</li>" +
+        "<li>Tocá <b>“Búsqueda de procesos”</b> y pegá este número en el campo " +
+        "<b>“Nº de proceso”</b> (o <b>“Nombre de proceso”</b>):</li>" +
+      "</ol>" +
+      '<div class="copybox__num">' +
+        '<span class="copybox__code">' + esc(nro) + "</span>" +
+        '<button type="button" class="copybtn" data-copy="' + esc(nro) + '">Copiar</button>' +
+      "</div></div>";
   }
 
   function renderCard(row) {
@@ -1445,7 +1498,9 @@ PLANTILLA = r"""<title>Licitaciones de Neumáticos</title>
     document.getElementById("cobertura").textContent =
       "135 municipios de la Provincia de Buenos Aires (vía SIBOM, el boletín oficial " +
       "municipal compartido); el Estado provincial —ministerios, Vialidad, hospitales, " +
-      "organismos y municipios adheridos— vía PBAC; y la Ciudad de Buenos Aires vía BAC.";
+      "organismos y municipios adheridos— vía PBAC; la Ciudad de Buenos Aires vía BAC; " +
+      "el Estado nacional —ministerios, Fuerzas Armadas, Parques Nacionales, hospitales " +
+      "y universidades— vía COMPR.AR; y Corredores Viales S.A.";
     document.getElementById("pie").textContent =
       "Radar de Licitaciones · proyecto interno · datos de fuentes oficiales del Estado.";
   }
@@ -1487,6 +1542,8 @@ PLANTILLA = r"""<title>Licitaciones de Neumáticos</title>
     else irA(t.tab, t.sub);
   });
   document.getElementById("lista").addEventListener("click", function (e) {
+    var cbtn = e.target.closest(".copybtn");
+    if (cbtn) { copiar(cbtn); return; }
     var head = e.target.closest(".card__head"); if (!head) return;
     var card = head.closest(".card");
     var det = card.querySelector(".card__detail");
@@ -1494,6 +1551,37 @@ PLANTILLA = r"""<title>Licitaciones de Neumáticos</title>
     head.setAttribute("aria-expanded", abierto ? "true" : "false");
     if (det) det.hidden = !abierto;
   });
+
+  function copiar(btn) {
+    var txt = btn.getAttribute("data-copy") || "";
+    var ok = function () {
+      var prev = btn.getAttribute("data-label") || btn.textContent;
+      btn.setAttribute("data-label", prev);
+      btn.textContent = "Copiado ✓";
+      btn.classList.add("is-done");
+      setTimeout(function () {
+        btn.textContent = prev; btn.classList.remove("is-done");
+      }, 1600);
+    };
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(txt).then(ok, function () { copiarFallback(txt, ok); });
+      } else {
+        copiarFallback(txt, ok);
+      }
+    } catch (err) { copiarFallback(txt, ok); }
+  }
+  function copiarFallback(txt, ok) {
+    try {
+      var ta = document.createElement("textarea");
+      ta.value = txt; ta.setAttribute("readonly", "");
+      ta.style.position = "absolute"; ta.style.left = "-9999px";
+      document.body.appendChild(ta); ta.select();
+      document.execCommand("copy");
+      document.body.removeChild(ta);
+      ok();
+    } catch (e) {}
+  }
   document.getElementById("tema").addEventListener("click", function () {
     var actual = leerTema();
     var prox = TEMAS[(TEMAS.indexOf(actual) + 1) % TEMAS.length];

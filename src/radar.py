@@ -110,9 +110,13 @@ def de_bac(incluir_ruido):
 
 
 def de_comprar(incluir_ruido):
+    # Compras.aspx SIN el querystring cifrado tira la pantalla de error de ASP.NET
+    # (no hay sesion ni token). comprar_mvp.URL ya lo trae con el qs publico de
+    # "ver todas las compras"; es el mismo link que hay que mantener si el token
+    # rota. Como en PBAC/BAC, apunta al listado general, no al proceso puntual.
     yield from _filas_comprar(
         comprar_mvp.recolectar(incluir_ruido=incluir_ruido, verbose=True),
-        "comprar", "https://comprar.gob.ar/Compras.aspx")
+        "comprar", comprar_mvp.URL)
 
 
 def de_corredores(incluir_ruido):

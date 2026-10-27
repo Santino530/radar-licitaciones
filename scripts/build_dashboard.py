@@ -6,6 +6,7 @@ Lee:
   data/radar_sin_verificar.csv   (salida del motor: lo que hay que revisar)
   data/proveedores_conocidos.csv (contexto: quien ya le vende al Estado)
   data/contactos_compras.csv     (tabla manual: comprador -> mail/tel de compras)
+  data/municipios_inscriptos.csv (tabla manual: municipios donde ya somos proveedores)
 
 Escribe:
   web/dashboard.html   -> una pagina HTML autocontenida (datos embebidos como JSON)
@@ -68,10 +69,11 @@ def parse_fecha(s):
     return iso, label
 
 
-def cargar_radar(contactos=None):
+def cargar_radar(contactos=None, inscriptos=None):
     path = os.path.join(DATA, "radar_sin_verificar.csv")
     hoy = dt.date.today()
     contactos = contactos or {}
+    inscriptos = inscriptos or {}
     filas = []
     with open(path, newline="", encoding="utf-8") as f:
         for r in csv.DictReader(f):
@@ -160,6 +162,7 @@ def cargar_radar(contactos=None):
                 "detectada": detectada,
                 "corrida": (r.get("vista_ultima_corrida") or "").strip(),
                 "contacto": buscar_contacto(comprador, fuente, contactos),
+                "inscripto": buscar_contacto(comprador, fuente, inscriptos),
             })
     return filas
 
@@ -235,6 +238,25 @@ def cargar_contactos():
                 "web_compras": (r.get("web_compras") or "").strip(),
                 "notas": (r.get("notas") or "").strip(),
             }
+    return out
+
+
+def cargar_inscriptos():
+    """municipio (normalizado) -> datos de nuestra inscripcion como proveedor.
+    municipios_inscriptos.csv es manual: se carga cuando un municipio confirma el
+    alta, junto con lo que contestaron sobre como compran y donde publican."""
+    path = os.path.join(DATA, "municipios_inscriptos.csv")
+    out = {}
+    if not os.path.exists(path):
+        return out
+    with open(path, newline="", encoding="utf-8") as f:
+        for r in csv.DictReader(f):
+            k = _clave_comprador(r.get("municipio"))
+            if not k:
+                continue
+            out[k] = {c: (r.get(c) or "").strip() for c in (
+                "empresa", "estado", "nro_proveedor", "inscripto_desde",
+                "como_compran", "donde_mirar", "contacto", "notas")}
     return out
 
 
@@ -407,7 +429,7 @@ def main():
     args = ap.parse_args()
 
     contactos = cargar_contactos()
-    filas = ordenar(cargar_radar(contactos))
+    filas = ordenar(cargar_radar(contactos, cargar_inscriptos()))
     proveedores = cargar_proveedores()
     meta = construir_meta(filas)
     metricas = construir_metricas(cargar_historico())
@@ -727,6 +749,7 @@ PLANTILLA = r"""<title>Licitaciones de Neumáticos</title>
   }
   .chip--src { color: var(--accent); border-color: var(--accent); }
   .chip--zone { color: var(--ink); }
+  .chip--insc { color: var(--open); border-color: currentColor; font-weight: 600; }
   .card__foot {
     display: flex; flex-wrap: wrap; gap: 4px 16px; align-items: center;
     margin-top: 11px; padding-top: 10px; border-top: 1px dashed var(--line);
@@ -1110,6 +1133,24 @@ PLANTILLA = r"""<title>Licitaciones de Neumáticos</title>
       '<p style="margin:8px 0 0">' + buscar + "</p></div>";
   }
 
+  function inscriptoHTML(row) {
+    var i = row.inscripto;
+    if (!i) return "";
+    var r = "";
+    r += '<div class="contacto__row"><b>Empresa</b>' + esc(i.empresa) +
+      (i.nro_proveedor ? " · proveedor N° " + esc(i.nro_proveedor) : "") +
+      (i.inscripto_desde ? " · desde " + esc(i.inscripto_desde) : "") + "</div>";
+    if (i.como_compran) r += '<div class="contacto__row"><b>Cómo compran</b>' + esc(i.como_compran) + "</div>";
+    if (i.donde_mirar) r += '<div class="contacto__row"><b>Dónde mirar</b>' +
+      (/^https?:/.test(i.donde_mirar)
+        ? '<a href="' + esc(i.donde_mirar) + '" target="_blank" rel="noopener">' + esc(i.donde_mirar) + "</a>"
+        : esc(i.donde_mirar)) + "</div>";
+    if (i.contacto) r += '<div class="contacto__row"><b>Contacto</b><a href="mailto:' + esc(i.contacto) + '">' +
+      esc(i.contacto) + "</a></div>";
+    if (i.notas) r += '<div class="contacto__row" style="color:var(--ink-soft)">' + esc(i.notas) + "</div>";
+    return '<div class="contacto"><p class="contacto__t">Ya somos proveedores de este municipio</p>' + r + "</div>";
+  }
+
   function detalleHTML(row) {
     var d = "";
     d += detFila("Comprador", esc(row.comprador));
@@ -1138,6 +1179,7 @@ PLANTILLA = r"""<title>Licitaciones de Neumáticos</title>
     return '<div class="card__detail" hidden>' +
       '<div class="detail">' + d + "</div>" +
       (esComprar ? avisoComprarHTML(row) : "") +
+      inscriptoHTML(row) +
       contactoHTML(row) +
       '<p class="detail__note">Datos sin verificar. Antes de presentarse, confirmá objeto, ' +
       "fechas y condiciones en el pliego oficial.</p></div>";
@@ -1170,6 +1212,7 @@ PLANTILLA = r"""<title>Licitaciones de Neumáticos</title>
     var p = pill(row);
     var chips = [];
     var fl = FUENTE_LABEL[row.fuente] || row.fuente;
+    if (row.inscripto) chips.push('<span class="chip chip--insc">✓ Ya somos proveedores</span>');
     if (fl) chips.push('<span class="chip chip--src">' + esc(fl) + "</span>");
     if (row.zona && ZONA_LABEL[row.zona]) {
       chips.push('<span class="chip chip--zone">' + esc(ZONA_LABEL[row.zona]) + "</span>");

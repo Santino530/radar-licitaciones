@@ -49,6 +49,7 @@ sys.path.insert(0, HERE)
 import bac_mvp  # noqa: E402
 import comprar_mvp  # noqa: E402
 import corredores_mvp  # noqa: E402
+import municipios_web_mvp  # noqa: E402
 import pbac_mvp  # noqa: E402
 import sibom_mvp  # noqa: E402
 
@@ -125,8 +126,32 @@ def de_corredores(incluir_ruido):
         "corredores", "https://corredoresvialessa.com.ar/licitaciones")
 
 
+def de_municipios(incluir_ruido):
+    # Webs propias de los municipios donde ya somos proveedores (Lanus, San Isidro).
+    # El N° de proceso se repite entre llamados (1er/2do llamado), asi que la
+    # clave es el link de cada publicacion; el N° va en "objeto" como referencia
+    # y el objeto de la compra en "fragmento" (texto principal del panel).
+    for r in municipios_web_mvp.recolectar(incluir_ruido=incluir_ruido, verbose=True):
+        yield {
+            "fuente": "municipio",
+            "id_origen": r["url"],
+            "comprador": r["unidad_ejecutora"],
+            "objeto": r["nro_proceso"],
+            "tipo": r["tipo"],
+            "fecha_publicacion": "",
+            "fecha_apertura": r["fecha_apertura"],
+            "estado": r["estado"],
+            "categoria_zona": "objetivo",
+            "es_ruido": "si" if r["es_ruido"] else "no",
+            "keywords": r["keywords_match"],
+            "url": r["url"],
+            "fragmento": r["nombre"],
+        }
+
+
 CONECTORES = {"sibom": de_sibom, "pbac": de_pbac, "bac": de_bac,
-              "comprar": de_comprar, "corredores": de_corredores}
+              "comprar": de_comprar, "corredores": de_corredores,
+              "municipio": de_municipios}
 
 
 def reclasificar(row):
@@ -140,7 +165,7 @@ def reclasificar(row):
         est = sibom_mvp.detectar_estado(texto)
         if est:
             row["estado"] = est
-    elif row.get("fuente") in ("pbac", "bac", "comprar", "corredores"):
+    elif row.get("fuente") in ("pbac", "bac", "comprar", "corredores", "municipio"):
         row["es_ruido"] = "si" if pbac_mvp.es_ruido(texto) else "no"
 
 

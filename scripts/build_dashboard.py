@@ -144,7 +144,7 @@ def cargar_radar(contactos=None, inscriptos=None):
                 "texto": texto,
                 "ref": ref,
                 "tipo": tipo,
-                "id_origen": id_origen,
+                "id_origen": objeto if fuente == "municipio" else id_origen,
                 "estado": estado,
                 "grupo": grupo,
                 "cierre": cierre,
@@ -704,6 +704,7 @@ PLANTILLA = r"""<title>Licitaciones de Neumáticos</title>
     background: var(--accent); color: var(--surface); text-decoration: none;
     font-size: 12px; font-weight: 500; padding: 6px 11px; border-radius: 7px;
   }
+  .contacto a.btn-buscar { color: var(--surface); }  /* le gana a ".contacto a" */
   .detail__note { font-size: 11.5px; color: var(--ink-soft); margin: 10px 0 0; }
 
   /* aviso "cómo abrir el proceso" (COMPR.AR no permite deep-link) */
@@ -1034,7 +1035,7 @@ PLANTILLA = r"""<title>Licitaciones de Neumáticos</title>
   var ZONA_LABEL = {
     objetivo: "Zona objetivo", volumen_alto: "Volumen alto", fuera: "Fuera de zona"
   };
-  var FUENTE_LABEL = { sibom: "SIBOM", pbac: "PBAC", bac: "BAC · CABA", comprar: "COMPR.AR · Nación", corredores: "Corredores Viales" };
+  var FUENTE_LABEL = { sibom: "SIBOM", pbac: "PBAC", bac: "BAC · CABA", comprar: "COMPR.AR · Nación", corredores: "Corredores Viales", municipio: "Web municipal" };
 
   var GRUPO_DE_TAB = { vigentes: "vigente", cerradas: "cerrada", ruido: "ruido" };
   var TABS_VALIDAS = { vigentes: 1, cerradas: 1, metricas: 1, ruido: 1 };

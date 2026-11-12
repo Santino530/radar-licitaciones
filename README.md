@@ -6,7 +6,7 @@ organismos del sector estatal argentino (foco AMBA + Provincia de Buenos Aires).
 
 ## Cómo funciona
 
-1. **Motor** (`src/radar.py`) — corre en GitHub Actions 3 veces por día. Consulta cinco
+1. **Motor** (`src/radar.py`) — corre en GitHub Actions 3 veces por día. Consulta seis
    fuentes y guarda lo que matchea en `data/radar_sin_verificar.csv`:
    - `src/sibom_mvp.py` — SIBOM, el boletín oficial digital de ~135 municipios de la
      Provincia de Buenos Aires.
@@ -21,11 +21,24 @@ organismos del sector estatal argentino (foco AMBA + Provincia de Buenos Aires).
      administra las rutas nacionales concesionadas. Licita por su cuenta (no entra
      por COMPR.AR) y compra neumáticos y cubiertas para su flota vial. Usa la misma
      API JSON pública que su web de licitaciones.
+   - `src/municipios_web_mvp.py` — webs propias de municipios donde ya somos
+     proveedores y que publican sus licitaciones ahí: **Lanús** (Documentos
+     oficiales → Licitaciones Públicas/Privadas del año; Lanús no está en SIBOM) y
+     **San Isidro** (www.sanisidro.gob.ar/compras + la ficha de cada licitación para la
+     fecha de apertura). Esteban Echeverría no tiene listado propio: publica en el
+     boletín, que ya cubre SIBOM.
 2. **Filtros** — palabras clave del rubro + descarte de falsos positivos (cámara de
    video, batería de generador, recapado asfáltico de calzada, etc.). Cada licitación
    se clasifica en *vigente* / *cerrada* / *descartada* y caduca sola cuando pasa la
    fecha de apertura (o, si no hay fecha, a los 45 días de publicada).
-3. **Panel** (`scripts/build_dashboard.py`) — genera `docs/index.html`, servido como
+3. **Municipios inscriptos** (`data/municipios_inscriptos.csv`) — tabla manual con los
+   municipios donde la empresa ya está dada de alta como proveedor (hoy San Isidro,
+   Lanús y Esteban Echeverría), con lo que contestó cada uno sobre cómo compra y dónde
+   publica. Las licitaciones de esos municipios salen en el panel con la marca
+   **✓ Ya somos proveedores** y, al abrir la tarjeta, el detalle de la inscripción.
+   Ojo: en los tres, los concursos de precios y compras directas se invitan **por mail**
+   a los inscriptos y no se publican; el radar solo ve las licitaciones públicas.
+4. **Panel** (`scripts/build_dashboard.py`) — genera `docs/index.html`, servido como
    GitHub Pages: `https://santino530.github.io/radar-licitaciones/`. Se regenera y
    publica en cada corrida del motor.
 
@@ -40,12 +53,15 @@ src/
   bac_mvp.py      conector BAC
   comprar_mvp.py  conector COMPR.AR (Nación)
   corredores_mvp.py  conector Corredores Viales S.A.
+  municipios_web_mvp.py  conector webs municipales (Lanús, San Isidro)
 scripts/build_dashboard.py    arma el panel HTML desde los CSV
 data/
   radar_sin_verificar.csv     salida del motor
   contactos_compras.csv       comprador → oficina de compras (dato de webs oficiales)
+  municipios_inscriptos.csv   municipios donde ya somos proveedores + cómo compran
   proveedores_conocidos.csv   adjudicatarios detectados (dato de boletines oficiales)
   fuentes_objetivo.csv · sibom_city_ids.csv
+  certs/                      certificado intermedio que la web de San Isidro no envía
 docs/index.html               el panel (GitHub Pages)
 web/dashboard.html            misma página, versión para publicar como Artifact
 ```

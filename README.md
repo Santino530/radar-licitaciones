@@ -38,7 +38,13 @@ organismos del sector estatal argentino (foco AMBA + Provincia de Buenos Aires).
    **✓ Ya somos proveedores** y, al abrir la tarjeta, el detalle de la inscripción.
    Ojo: en los tres, los concursos de precios y compras directas se invitan **por mail**
    a los inscriptos y no se publican; el radar solo ve las licitaciones públicas.
-4. **Panel** (`scripts/build_dashboard.py`) — genera `docs/index.html`, servido como
+4. **Empresas privadas** (`data/fuentes_objetivo.csv`, filas con conector `privada_portal`) —
+   portales y páginas donde empresas privadas (y algún ente como el Mercado Central) publican
+   sus compras o licitaciones. Salen de lo que nos contestaron en la campaña de mails
+   (repo campa-a-nuevos-clientes). Hoy se revisan a mano porque casi todos piden usuario
+   (SAP Ariba, Oracle). La única abierta es la de contrataciones directas del Mercado Central,
+   que es candidata a un conector. Cada fila tiene el estado del alta y quién lo indicó.
+5. **Panel** (`scripts/build_dashboard.py`) — genera `docs/index.html`, servido como
    GitHub Pages: `https://santino530.github.io/radar-licitaciones/`. Se regenera y
    publica en cada corrida del motor.
 

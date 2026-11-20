@@ -127,18 +127,18 @@ def de_corredores(incluir_ruido):
 
 
 def de_municipios(incluir_ruido):
-    # Webs propias de los municipios donde ya somos proveedores (Lanus, San Isidro).
-    # El N° de proceso se repite entre llamados (1er/2do llamado), asi que la
-    # clave es el link de cada publicacion; el N° va en "objeto" como referencia
-    # y el objeto de la compra en "fragmento" (texto principal del panel).
+    # Webs propias de municipios (Lanus, San Isidro, Avellaneda, Florencio Varela,
+    # Berazategui). El N° de proceso se repite entre llamados (1er/2do llamado) y
+    # algunas webs listan todo en una sola pagina, asi que la clave es link + N°;
+    # el N° va en "objeto" como referencia y el objeto de la compra en "fragmento".
     for r in municipios_web_mvp.recolectar(incluir_ruido=incluir_ruido, verbose=True):
         yield {
             "fuente": "municipio",
-            "id_origen": r["url"],
+            "id_origen": f'{r["url"]}#{r["nro_proceso"]}',
             "comprador": r["unidad_ejecutora"],
             "objeto": r["nro_proceso"],
             "tipo": r["tipo"],
-            "fecha_publicacion": "",
+            "fecha_publicacion": r.get("fecha_publicacion", ""),
             "fecha_apertura": r["fecha_apertura"],
             "estado": r["estado"],
             "categoria_zona": "objetivo",

@@ -105,7 +105,33 @@ def hoy_ar():
     return dt.datetime.now(AR).date()
 
 
-def cargar_radar(contactos=None, inscriptos=None):
+UOC_RE = re.compile(r"^(\d+)(?:/(\d+))?-")
+
+
+def cargar_uoc_comprar():
+    """data/comprar_uoc.csv (lo arma scripts/actualizar_uoc_comprar.py):
+    codigo de unidad de compras de COMPR.AR -> (unidad, organismo)."""
+    path = os.path.join(DATA, "comprar_uoc.csv")
+    out = {}
+    if not os.path.exists(path):
+        return out
+    with open(path, newline="", encoding="utf-8") as f:
+        for r in csv.DictReader(f):
+            out[(r.get("uoc") or "").strip()] = ((r.get("unidad") or "").strip(),
+                                                 (r.get("organismo") or "").strip())
+    return out
+
+
+def nombre_comprar(id_origen, uoc):
+    """'74/43-0626-LPR26' -> ('Parque Nacional Patagonia',
+    'Administración de Parques Nacionales'), o None si no esta en la tabla."""
+    m = UOC_RE.match(id_origen or "")
+    if not m:
+        return None
+    return uoc.get(f"{int(m.group(1))}/{int(m.group(2) or 0)}")
+
+
+def cargar_radar(contactos=None, inscriptos=None, uoc=None):
     path = os.path.join(DATA, "radar_sin_verificar.csv")
     hoy = hoy_ar()
     contactos = contactos or {}
@@ -176,9 +202,18 @@ def cargar_radar(contactos=None, inscriptos=None):
                 pass
 
             comprador = (r.get("comprador") or "").strip()
+            unidad = ""
+            if fuente == "comprar":
+                # el conector trae "Nación · unidad NNNN"; el nombre sale del
+                # codigo de unidad que encabeza el numero de proceso
+                nom = nombre_comprar(id_origen, uoc or {})
+                if nom and nom[1]:
+                    comprador, unidad = nom[1], nom[0]
+                    ref = f"{unidad} · Proceso {id_origen}" if unidad else ref
             filas.append({
                 "fuente": fuente,
                 "comprador": comprador,
+                "unidad": unidad,
                 "objeto": objeto,
                 "fragmento": fragmento,
                 "texto": texto,
@@ -527,7 +562,7 @@ def main():
     args = ap.parse_args()
 
     contactos = cargar_contactos()
-    filas = ordenar(cargar_radar(contactos, cargar_inscriptos()))
+    filas = ordenar(cargar_radar(contactos, cargar_inscriptos(), cargar_uoc_comprar()))
     proveedores = cargar_proveedores()
     meta = construir_meta(filas)
     metricas = construir_metricas(cargar_historico())
@@ -1373,6 +1408,7 @@ PLANTILLA = r"""<title>Licitaciones de Neumáticos</title>
     d += detFila("Objeto / referencia", esc(row.objeto));
     d += detFila("Detalle del boletín", esc(row.fragmento));
     d += detFila("Tipo de proceso", esc(row.tipo));
+    d += detFila("Unidad de compras", esc(row.unidad));
     d += detFila("N° de proceso / expediente", esc(row.id_origen));
     d += detFila("Fuente", esc(FUENTE_LABEL[row.fuente] || row.fuente));
     d += detFila("Estado", esc(row.estado) ||
@@ -1471,7 +1507,7 @@ PLANTILLA = r"""<title>Licitaciones de Neumáticos</title>
     if (state.producto && (row.productos || []).indexOf(state.producto) === -1) return false;
     if (state.q) {
       // sin distinguir tildes ni mayusculas: "neumatico" encuentra "NEUMÁTICOS"
-      var hay = sinTildes(row.comprador + " " + row.texto + " " + row.ref + " " +
+      var hay = sinTildes(row.comprador + " " + (row.unidad || "") + " " + row.texto + " " + row.ref + " " +
                  (row.keywords || []).join(" "));
       var palabras = sinTildes(state.q).split(/\s+/).filter(Boolean);
       for (var i = 0; i < palabras.length; i++)

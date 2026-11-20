@@ -1462,13 +1462,20 @@ PLANTILLA = r"""<title>Licitaciones de Neumáticos</title>
       "</article>";
   }
 
+  function sinTildes(t) {
+    return String(t || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  }
+
   function pasaBusqueda(row) {
     if (state.zona && row.zona !== state.zona) return false;
     if (state.producto && (row.productos || []).indexOf(state.producto) === -1) return false;
     if (state.q) {
-      var hay = (row.comprador + " " + row.texto + " " + row.ref + " " +
-                 (row.keywords || []).join(" ")).toLowerCase();
-      if (hay.indexOf(state.q.toLowerCase()) === -1) return false;
+      // sin distinguir tildes ni mayusculas: "neumatico" encuentra "NEUMÁTICOS"
+      var hay = sinTildes(row.comprador + " " + row.texto + " " + row.ref + " " +
+                 (row.keywords || []).join(" "));
+      var palabras = sinTildes(state.q).split(/\s+/).filter(Boolean);
+      for (var i = 0; i < palabras.length; i++)
+        if (hay.indexOf(palabras[i]) === -1) return false;
     }
     return true;
   }

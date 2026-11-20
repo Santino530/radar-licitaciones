@@ -56,7 +56,7 @@ KEYWORDS = [
 RUIDO_PATRONES = [
     "asfalt", "bitumin", "fresado",                       # repavimentacion
     "de desuso", "fuera de uso", "nfu", "reciclad",        # residuos
-    "camara de video", "camara ip", "camara de seg", "camara frigor",
+    "camara de video", "camara ip", "camara de seg", "camara frigor", "domos",
     "camara de frio", "camara gesell", "camara digital", "camara fotograf",
     "camara de foto", "camara web", "camara termografica", "camara de television",
     "camara de conservacion", "mantenimiento y reparacion de camara",  # camaras de frio de hospitales

@@ -41,25 +41,62 @@ from pbac_mvp import KEYWORDS, es_ruido, norm
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 DATA = os.path.normpath(os.path.join(HERE, "..", "data"))
-CERT_SECTIGO = os.path.join(DATA, "certs", "sectigo_public_server_auth_ca_ov_r36.pem")
+CERTS_DIR = os.path.join(DATA, "certs")
 UA = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) radar-licitaciones"}
 
 LANUS_BASE = "https://www.lanus.gob.ar/documentos-oficiales"
 LANUS_PAGINAS = 3          # ~10 items por pagina; alcanza para lo del ultimo mes y medio
 SAN_ISIDRO_URL = "https://www.sanisidro.gob.ar/compras"
+AVELLANEDA_URL = "https://www.mda.gob.ar/tramites/licitaciones/"
+AVELLANEDA_MAX = 40
+VARELA_URL = "https://varela.gob.ar/lic/"
+BERAZATEGUI_API = ("https://berazategui.gob.ar/wp-json/wp/v2/posts"
+                   "?categories=150&per_page=20&_fields=date,title,link,content")
+VENTANA_DIAS = 90          # publicaciones sin fecha de apertura: solo lo reciente
 
 
 def _ctx(con_sectigo=False):
+    """Contexto TLS con verificacion. Varias webs municipales (San Isidro, Avellaneda)
+    no envian el certificado intermedio de Sectigo: se agregan los de data/certs/
+    a la cadena de confianza del sistema en lugar de desactivar la verificacion."""
     ctx = ssl.create_default_context()
-    if con_sectigo and os.path.exists(CERT_SECTIGO):
-        ctx.load_verify_locations(CERT_SECTIGO)
+    if con_sectigo and os.path.isdir(CERTS_DIR):
+        for f in sorted(os.listdir(CERTS_DIR)):
+            if f.endswith(".pem"):
+                ctx.load_verify_locations(os.path.join(CERTS_DIR, f))
     return ctx
 
 
-def _get(url, con_sectigo=False, timeout=60):
-    req = urllib.request.Request(url, headers=UA)
+def _get_bytes(url, con_sectigo=False, timeout=60):
+    req = urllib.request.Request(urllib.parse.quote(url, safe=":/?&=%#"), headers=UA)
     with urllib.request.urlopen(req, timeout=timeout, context=_ctx(con_sectigo)) as r:
-        return r.read().decode("utf-8", "replace")
+        return r.read()
+
+
+def _get(url, con_sectigo=False, timeout=60):
+    return _get_bytes(url, con_sectigo, timeout).decode("utf-8", "replace")
+
+
+MESES = {m: i for i, m in enumerate(
+    ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto",
+     "septiembre", "octubre", "noviembre", "diciembre"], 1)}
+
+
+def _fecha_larga(texto):
+    """'10 de diciembre de 2026' -> '10/12/2026'."""
+    m = re.search(r"(\d{1,2}) de (\w+) de (\d{4})", norm(texto))
+    if not m or m.group(2) not in MESES:
+        return ""
+    return f"{int(m.group(1)):02d}/{MESES[m.group(2)]:02d}/{m.group(3)}"
+
+
+def _reciente(fecha_ddmmyyyy, hoy=None):
+    hoy = hoy or dt.date.today()
+    try:
+        d, mth, y = (int(x) for x in fecha_ddmmyyyy.split("/"))
+        return (hoy - dt.date(y, mth, d)).days <= VENTANA_DIAS
+    except ValueError:
+        return True
 
 
 def _texto(fragmento_html):
@@ -73,13 +110,14 @@ def _keywords(texto):
     return [k for k in KEYWORDS if k in t]
 
 
-def _fila(comprador, nro, objeto, tipo, apertura, url):
+def _fila(comprador, nro, objeto, tipo, apertura, url, publicacion=""):
     m = _keywords(objeto)
     return {
         "nro_proceso": nro,
         "nombre": objeto,
         "tipo": tipo,
         "fecha_apertura": apertura,
+        "fecha_publicacion": publicacion,
         "estado": "",
         "unidad_ejecutora": comprador,
         "keywords_match": ",".join(m),
@@ -178,7 +216,103 @@ def recolectar_san_isidro(verbose=False, todas=False):
     return filas
 
 
-FUENTES = {"lanus": recolectar_lanus, "san_isidro": recolectar_san_isidro}
+# --- Avellaneda ----------------------------------------------------------------
+
+def recolectar_avellaneda(verbose=False):
+    """Listado de mda.gob.ar/tramites/licitaciones: cada item trae numero, objeto y
+    fecha del decreto de llamado (la apertura esta en la nota PDF). Se usa la fecha
+    del decreto como fecha de publicacion y se toma solo lo de VENTANA_DIAS."""
+    pagina = _get(AVELLANEDA_URL, con_sectigo=True, timeout=120)
+    filas = []
+    # la pagina lista TODO el historico (700+ llamados), del mas nuevo al mas viejo;
+    # alcanza con los primeros AVELLANEDA_MAX (los viejos a veces no traen fecha)
+    cajas = re.findall(r'(?s)<div class="caja-sombra">(.*?)</div>\s*</li>', pagina)
+    for caja in cajas[:AVELLANEDA_MAX]:
+        cab = _texto(caja.split("<br")[0])
+        cuerpo = _texto((re.search(r"(?s)<strong>(.*?)</strong>", caja) or [None, ""])[1])
+        if not cab.upper().startswith(("LICITACI", "CONCURSO")):
+            continue
+        fecha = (re.search(r"fechado el (\d{1,2}/\d{1,2}/\d{4})", cuerpo) or [None, ""])[1]
+        if fecha and not _reciente(fecha):
+            continue
+        objeto = re.sub(r"\s*DECRETO.*$", "", cuerpo, flags=re.I).strip()
+        nota = (re.search(r'href="([^"]+)"', caja) or [None, AVELLANEDA_URL])[1]
+        tipo = "Licitación Privada" if "PRIVADA" in cab.upper() else "Licitación Pública"
+        filas.append(_fila("Avellaneda", cab.title(), objeto, tipo, "", nota, fecha))
+    if verbose:
+        print(f"   avellaneda: {len(filas)} licitaciones recientes")
+    return filas
+
+
+# --- Florencio Varela ----------------------------------------------------------
+
+def recolectar_varela(verbose=False):
+    """varela.gob.ar/lic: bloques con 'LICITACION PUBLICA N X/AAAA', OBJETO y APERTURA,
+    o links al PDF con el objeto en el titulo. Se recorta el texto por cada llamado."""
+    pagina = _get(VARELA_URL, timeout=90)
+    txt = _texto(re.sub(r"(?s)<(script|style).*?</\1>", "", pagina))
+    patron = re.compile(r"LICITACI[OÓ]N (P[UÚ]BLICA|PRIVADA) N[°º]\s*(\d+)\s*[-/]\s*(\d{4})", re.I)
+    marcas = list(patron.finditer(txt))
+    vistos, filas = set(), []
+    for k, m in enumerate(marcas):
+        nro = f"{m.group(2)}/{m.group(3)}"
+        if nro in vistos:
+            continue
+        vistos.add(nro)
+        seg = txt[m.end(): marcas[k + 1].start() if k + 1 < len(marcas) else m.end() + 1500]
+        obj = re.search(r"OBJETO:\s*(.+?)(?:\. [A-Z]{4,}|FICHA|CONSULTAS|APERTURA|$)", seg)
+        objeto = (obj.group(1) if obj else re.sub(r"^[^:]*:\s*", "", seg[:250])).strip(" .:-—")
+        ap = (re.search(r"APERTURA:\s*(\d{1,2}/\d{1,2}/\d{4})", seg) or [None, ""])[1]
+        tipo = "Licitación Privada" if "PRIV" in m.group(1).upper() else "Licitación Pública"
+        filas.append(_fila("Florencio Varela", f"LP N°{nro}", objeto[:300], tipo, ap, VARELA_URL))
+    if verbose:
+        print(f"   florencio varela: {len(filas)} licitaciones leidas")
+    return filas
+
+
+# --- Berazategui ---------------------------------------------------------------
+
+def _pdf_texto(datos):
+    try:
+        import io
+        from pypdf import PdfReader
+        return " ".join((p.extract_text() or "") for p in PdfReader(io.BytesIO(datos)).pages[:2])
+    except BaseException as e:  # noqa: BLE001  (sin pypdf o PDF escaneado: queda el titulo)
+        if isinstance(e, (KeyboardInterrupt, SystemExit)):
+            raise
+        return ""
+
+
+def recolectar_berazategui(verbose=False):
+    """Las licitaciones se publican como entradas de WordPress (categoria 150). El
+    objeto y la apertura estan en el PDF adjunto a cada entrada: se baja solo para
+    las de los ultimos VENTANA_DIAS."""
+    import json
+    posts = json.loads(_get(BERAZATEGUI_API, timeout=90))
+    filas = []
+    for p in posts:
+        pub = dt.date.fromisoformat(p["date"][:10]).strftime("%d/%m/%Y")
+        if not _reciente(pub):
+            continue
+        titulo = _texto(p["title"]["rendered"])
+        pdf = (re.search(r'href="([^"]+\.pdf)"', p["content"]["rendered"]) or [None, ""])[1]
+        pdf = urllib.parse.urljoin("https://berazategui.gob.ar/", pdf) if pdf else p["link"]
+        texto = re.sub(r"\s+", " ", _pdf_texto(_get_bytes(pdf, timeout=90)) if pdf.endswith(".pdf") else "")
+        obj = re.search(r"objeto:\s*[“\"]?(.+?)[”\"]?\s*(?:Presupuesto|Venta|$)", texto, re.I)
+        objeto = obj.group(1).strip() if obj else titulo
+        ap = _fecha_larga((re.search(r"Apertura de ofertas:(.{0,120})", texto, re.I) or [None, ""])[1])
+        nro = (re.search(r"N[°º]\s*(\d+/\d{4})", titulo) or [None, titulo])[1]
+        if "segundo llamado" in titulo.lower():
+            nro += " (2do llamado)"
+        filas.append(_fila("Berazategui", f"LP N°{nro}", objeto, "Licitación Pública", ap, pdf, pub))
+    if verbose:
+        print(f"   berazategui: {len(filas)} licitaciones recientes")
+    return filas
+
+
+FUENTES = {"lanus": recolectar_lanus, "san_isidro": recolectar_san_isidro,
+           "avellaneda": recolectar_avellaneda, "florencio_varela": recolectar_varela,
+           "berazategui": recolectar_berazategui}
 
 
 def recolectar(incluir_ruido=True, verbose=False):

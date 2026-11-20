@@ -30,7 +30,7 @@ jobs:
           python-version: "3.12"
 
       - name: Instalar dependencias
-        run: pip install openpyxl
+        run: pip install openpyxl pypdf
 
       - name: Correr el radar
         run: python src/radar.py

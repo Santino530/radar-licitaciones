@@ -43,7 +43,24 @@ CATEGORIA_PRODUCTO = [
 ]
 DIAS_NUEVA = 7            # una deteccion de los ultimos N dias se marca "nueva"
 DIAS_SIBOM_VIGENTE = 45   # SIBOM sin fecha de apertura: vigente hasta N dias de publicada
-GRACIA_APERTURA = 1       # dias despues de la apertura antes de darla por cerrada
+GRACIA_APERTURA = 0       # dias despues de la apertura antes de darla por cerrada
+# Las corridas de Actions son en UTC (la de las 02:00 UTC es "ayer" en Argentina):
+# las cuentas de dias se hacen en hora argentina para no correr las fechas un dia.
+AR = dt.timezone(dt.timedelta(hours=-3), "ART")
+
+# Segundo filtro de falsos positivos, del lado del panel (no toca el CSV del radar).
+# Solo descarta cuando el texto deja claro que no es de vehiculos; cada regla
+# deja el motivo a la vista en la pestaña "Descartadas".
+RUIDO_PANEL = [
+    (r"camaras? (frigorific|trampa|de (video|seguridad|vigilancia|fotos?)|fotografic|"
+     r"trasera|de retroceso|submarin|termografic|ip\b)", "cámara que no es de neumático"),
+    (r"(cubiertas? de (tejas?|techo|chapa|maniobra)|madera.*cubierta|"
+     r"reparacion integral de cubierta|cubierta del edificio|impermeabiliz)",
+     "cubierta de techo / edificio / buque, no de neumático"),
+    (r"(\bups\b|telepuerto|satelital|bancos? de baterias|baterias? de litio|"
+     r"grupo electrogeno|generador|panel(es)? solar)", "batería que no es de vehículo"),
+    (r"solicitud de habilitacion", "habilitación comercial, no es una compra"),
+]
 
 
 def productos_de(keywords):
@@ -69,9 +86,28 @@ def parse_fecha(s):
     return iso, label
 
 
+def _norm(s):
+    s = s.lower()
+    for a, b in (("á", "a"), ("é", "e"), ("í", "i"), ("ó", "o"), ("ú", "u"), ("ü", "u")):
+        s = s.replace(a, b)
+    return s
+
+
+def motivo_ruido_panel(texto):
+    t = _norm(texto)
+    for patron, motivo in RUIDO_PANEL:
+        if re.search(patron, t):
+            return motivo
+    return ""
+
+
+def hoy_ar():
+    return dt.datetime.now(AR).date()
+
+
 def cargar_radar(contactos=None, inscriptos=None):
     path = os.path.join(DATA, "radar_sin_verificar.csv")
-    hoy = dt.date.today()
+    hoy = hoy_ar()
     contactos = contactos or {}
     inscriptos = inscriptos or {}
     filas = []
@@ -100,7 +136,11 @@ def cargar_radar(contactos=None, inscriptos=None):
             # 3 grupos para las pestañas: vigente / cerrada / ruido.
             # "cierre" explica POR QUE una cerrada esta cerrada (para el cartel).
             cierre = ""
+            motivo_ruido = "" if es_ruido else motivo_ruido_panel(
+                " ".join((r.get("objeto") or "", r.get("fragmento") or "")))
             if es_ruido:
+                grupo = "ruido"
+            elif motivo_ruido:
                 grupo = "ruido"
             elif estado in ("adjudicada", "cerrada"):
                 grupo = "cerrada"
@@ -148,6 +188,7 @@ def cargar_radar(contactos=None, inscriptos=None):
                 "estado": estado,
                 "grupo": grupo,
                 "cierre": cierre,
+                "motivo_ruido": motivo_ruido,
                 "por_vencer": por_vencer,
                 "zona": (r.get("categoria_zona") or "").strip(),
                 "keywords": kws,
@@ -431,7 +472,7 @@ def construir_meta(filas):
     ultima = max(corridas) if corridas else ""
     vigentes = [f for f in filas if f["grupo"] == "vigente"]
     return {
-        "generado": dt.datetime.now().strftime("%Y-%m-%d %H:%M"),
+        "generado": dt.datetime.now(AR).strftime("%Y-%m-%d %H:%M"),
         "ultima_corrida": ultima,
         "vigentes": len(vigentes),
         "por_vencer": sum(1 for f in vigentes if f["por_vencer"]),
@@ -1162,6 +1203,7 @@ PLANTILLA = r"""<title>Licitaciones de Neumáticos</title>
       return { cls: "closed", txt: "Cerrada" };
     }
     var d = row.dias_apertura;
+    if (d === 0) return { cls: "soon", txt: "Apertura hoy" };
     if (d != null && d >= 0 && d <= 7) return { cls: "soon", txt: "Vence en " + d + " día" + (d === 1 ? "" : "s") };
     if (d != null && d > 7 && d <= 21) return { cls: "soon", txt: "Apertura en " + d + " días" };
     return { cls: "open", txt: "Vigente" };
@@ -1245,6 +1287,7 @@ PLANTILLA = r"""<title>Licitaciones de Neumáticos</title>
        : row.cierre === "apertura_pasada" ? "cerrada — la apertura de sobres ya pasó"
        : row.cierre === "vencida_estimada" ? "cerrada — estimado por antigüedad (sin fecha de apertura publicada)"
        : ""));
+    d += detFila("Por qué se descartó", esc(row.motivo_ruido ? "filtro del panel: " + row.motivo_ruido : ""));
     d += detFila("Zona", esc(ZONA_LABEL[row.zona] || ""));
     d += detFila("Productos", esc((row.productos || []).join(", ")));
     d += detFila("Palabras clave que la detectaron", esc((row.keywords || []).join(", ")));
@@ -1294,6 +1337,7 @@ PLANTILLA = r"""<title>Licitaciones de Neumáticos</title>
     var chips = [];
     var fl = FUENTE_LABEL[row.fuente] || row.fuente;
     if (row.inscripto) chips.push('<span class="chip chip--insc">✓ Ya somos proveedores</span>');
+    if (row.motivo_ruido) chips.push('<span class="chip">Descartada: ' + esc(row.motivo_ruido) + "</span>");
     if (fl) chips.push('<span class="chip chip--src">' + esc(fl) + "</span>");
     if (row.zona && ZONA_LABEL[row.zona]) {
       chips.push('<span class="chip chip--zone">' + esc(ZONA_LABEL[row.zona]) + "</span>");
@@ -1344,8 +1388,9 @@ PLANTILLA = r"""<title>Licitaciones de Neumáticos</title>
       "a la pestaña “Cerradas”.",
     cerradas: "Ya no se puede ofertar (adjudicadas, sin efecto, o venció el plazo). Quedan " +
       "acá de comparación: quién compra, quién gana y a qué precio.",
-    ruido: "Falsos positivos que el filtro descartó (cámara de video, batería de generador, " +
-      "recapado asfáltico de calzada, etc.). A la vista para poder auditarlos."
+    ruido: "Falsos positivos descartados por el radar o por el panel (cámara de video, " +
+      "batería de UPS, cubierta de techo, habilitaciones…). En cada una, abrí el detalle para " +
+      "ver por qué. A la vista para poder auditarlos."
   };
 
   var ZONA_COLOR = { objetivo: "var(--c1)", volumen_alto: "var(--c2)", fuera: "var(--c3)", "": "var(--c-otros)" };

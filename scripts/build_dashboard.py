@@ -209,6 +209,60 @@ def cargar_proveedores():
     return out
 
 
+ESTADO_ALTA_RE = re.compile(r"(\d{2}/\d{2}/\d{4})")
+PROVEEDOR_RE = re.compile(r"proveedor\s+N?°?\s*(\d+)", re.I)
+# el panel se publica (Pages es publico): los mails de terceros quedan solo en el CSV
+MAIL = r"\b[\w.+-]+@[\w-]+(?:\.[\w-]+)+\b"
+EMAIL_RE = re.compile(r"\s*\(\s*" + MAIL + r"\s*\)|,?\s*" + MAIL)
+
+
+def _sin_mails(txt):
+    return EMAIL_RE.sub("", txt).strip()
+
+
+def _estado_alta(estado, requiere_cuenta):
+    """Normaliza estado_verificacion de fuentes_objetivo.csv a
+    aprobada / enviada / pendiente (o no_requiere si el portal no pide usuario)."""
+    e = estado.lower()
+    if "aprobad" in e:
+        return "aprobada"
+    if "enviad" in e:
+        return "enviada"
+    if requiere_cuenta.lower().startswith("no"):
+        return "no_requiere"
+    return "pendiente"
+
+
+def cargar_portales_privados():
+    """Filas de data/fuentes_objetivo.csv con conector privada_portal (solo lectura)."""
+    path = os.path.join(DATA, "fuentes_objetivo.csv")
+    out = []
+    if not os.path.exists(path):
+        return out
+    with open(path, newline="", encoding="utf-8") as f:
+        for r in csv.DictReader(f):
+            if (r.get("conector") or "").strip() != "privada_portal":
+                continue
+            estado_txt = (r.get("estado_verificacion") or "").strip()
+            requiere = (r.get("requiere_cuenta_para_ver") or "").strip()
+            m_fecha = ESTADO_ALTA_RE.search(estado_txt)
+            m_prov = PROVEEDOR_RE.search(estado_txt)
+            out.append({
+                "empresa": (r.get("municipio_u_organismo") or "").strip(),
+                "portal": (r.get("fuente") or "").strip(),
+                "url": (r.get("url") or "").strip(),
+                "pide_usuario": requiere.lower().startswith("si"),
+                "estado": _estado_alta(estado_txt, requiere),
+                "estado_txt": estado_txt,
+                "fecha": m_fecha.group(1) if m_fecha else "",
+                "nro_proveedor": m_prov.group(1) if m_prov else "",
+                "notas": _sin_mails(r.get("notas") or ""),
+            })
+    orden = {"aprobada": 0, "enviada": 1, "pendiente": 2, "no_requiere": 3}
+    out.sort(key=lambda x: (orden[x["estado"]], x["empresa"].lower()))
+    return out
+
+
 def _clave_comprador(s):
     """Normaliza el nombre del comprador para cruzar con contactos_compras.csv."""
     s = (s or "").lower().strip()
@@ -394,10 +448,11 @@ def json_para_script(x):
     return json.dumps(x, ensure_ascii=False).replace("</", "<\\/")
 
 
-def render(filas, proveedores, meta, metricas):
+def render(filas, proveedores, meta, metricas, portales=()):
     html = PLANTILLA
     html = html.replace("__RADAR_JSON__", json_para_script(filas))
     html = html.replace("__PROVEEDORES_JSON__", json_para_script(proveedores))
+    html = html.replace("__PORTALES_JSON__", json_para_script(list(portales)))
     html = html.replace("__META_JSON__", json_para_script(meta))
     html = html.replace("__METRICAS_JSON__", json_para_script(metricas))
     return html
@@ -434,7 +489,9 @@ def main():
     meta = construir_meta(filas)
     metricas = construir_metricas(cargar_historico())
 
-    bare = render(filas, proveedores, meta, metricas)
+    portales = cargar_portales_privados()
+
+    bare = render(filas, proveedores, meta, metricas, portales)
     os.makedirs(os.path.dirname(args.out), exist_ok=True)
     with open(args.out, "w", encoding="utf-8") as f:
         f.write(bare)
@@ -782,6 +839,25 @@ PLANTILLA = r"""<title>Licitaciones de Neumáticos</title>
   }
   .prov__what { font-size: 12px; color: var(--ink-soft); }
 
+  .portales { display: flex; flex-direction: column; gap: 10px; }
+  .portal {
+    background: var(--surface); border: 1px solid var(--line); border-radius: 8px;
+    padding: 10px 12px; min-width: 0;
+  }
+  .portal__head { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: baseline; }
+  .portal__name { font-weight: 600; font-size: 13.5px; color: var(--ink); }
+  .portal__chips { display: flex; flex-wrap: wrap; gap: 6px; margin-left: auto; }
+  .portal__link {
+    display: block; margin-top: 4px; font-size: 12.5px; color: var(--accent);
+    text-decoration: none; overflow-wrap: anywhere;
+  }
+  .portal__link:hover { text-decoration: underline; }
+  .portal__notas { font-size: 12px; color: var(--ink-soft); margin: 6px 0 0; overflow-wrap: anywhere; }
+  .chip--aprobada { color: var(--open); border-color: currentColor; font-weight: 600; }
+  .chip--enviada { color: var(--accent); border-color: currentColor; font-weight: 600; }
+  .chip--pendiente { color: var(--soon); border-color: currentColor; font-weight: 600; }
+  .chip--no_requiere { color: var(--ink-soft); }
+
   footer {
     margin-top: 40px; padding-top: 18px; border-top: 1px solid var(--line);
     font-size: 12.5px; color: var(--ink-soft);
@@ -1006,6 +1082,8 @@ PLANTILLA = r"""<title>Licitaciones de Neumáticos</title>
 
   <main id="lista"></main>
 
+  <aside class="aside" id="portales"></aside>
+
   <aside class="aside" id="proveedores"></aside>
 
   <footer>
@@ -1022,6 +1100,7 @@ PLANTILLA = r"""<title>Licitaciones de Neumáticos</title>
 
 <script id="radar-data" type="application/json">__RADAR_JSON__</script>
 <script id="proveedores-data" type="application/json">__PROVEEDORES_JSON__</script>
+<script id="portales-data" type="application/json">__PORTALES_JSON__</script>
 <script id="meta-data" type="application/json">__META_JSON__</script>
 <script id="metricas-data" type="application/json">__METRICAS_JSON__</script>
 <script>
@@ -1029,6 +1108,7 @@ PLANTILLA = r"""<title>Licitaciones de Neumáticos</title>
   "use strict";
   var RADAR = JSON.parse(document.getElementById("radar-data").textContent);
   var PROV = JSON.parse(document.getElementById("proveedores-data").textContent);
+  var PORTALES = JSON.parse(document.getElementById("portales-data").textContent);
   var META = JSON.parse(document.getElementById("meta-data").textContent);
   var MET = JSON.parse(document.getElementById("metricas-data").textContent);
 
@@ -1549,6 +1629,40 @@ PLANTILLA = r"""<title>Licitaciones de Neumáticos</title>
       "Radar de Licitaciones · proyecto interno · datos de fuentes oficiales del Estado.";
   }
 
+  var ESTADO_ALTA_LABEL = {
+    aprobada: "Alta aprobada", enviada: "Alta enviada",
+    pendiente: "Alta pendiente", no_requiere: "No pide alta"
+  };
+
+  function renderPortales() {
+    var box = document.getElementById("portales");
+    if (!PORTALES.length) { box.hidden = true; return; }
+    var cuenta = { aprobada: 0, enviada: 0, pendiente: 0 };
+    var rows = PORTALES.map(function (p) {
+      if (p.estado in cuenta) cuenta[p.estado]++;
+      var estado = ESTADO_ALTA_LABEL[p.estado] || p.estado;
+      if (p.nro_proveedor) estado += " · proveedor N° " + p.nro_proveedor;
+      else if (p.fecha && p.estado !== "no_requiere") estado += " · " + p.fecha;
+      var chips =
+        '<span class="chip chip--' + esc(p.estado) + '" title="' + esc(p.estado_txt) + '">' +
+          esc(estado) + "</span>" +
+        '<span class="chip">' + (p.pide_usuario ? "Pide usuario" : "Sin usuario") + "</span>";
+      var link = p.url
+        ? '<a class="portal__link" href="' + esc(p.url) + '" target="_blank" rel="noopener">' +
+            esc(p.portal || p.url) + " ↗</a>"
+        : "";
+      return '<div class="portal"><div class="portal__head"><span class="portal__name">' +
+        esc(p.empresa) + '</span><span class="portal__chips">' + chips + "</span></div>" +
+        link + (p.notas ? '<p class="portal__notas">' + esc(p.notas) + "</p>" : "") + "</div>";
+    }).join("");
+    box.innerHTML =
+      '<h2 class="aside__title">Portales de empresas privadas</h2>' +
+      '<p class="aside__note">No los lee el radar: hay que entrar a mano. ' +
+      cuenta.aprobada + " aprobadas · " + cuenta.enviada + " enviadas · " +
+      cuenta.pendiente + " pendientes. Debajo de cada una, quién lo indicó.</p>" +
+      '<div class="portales">' + rows + "</div>";
+  }
+
   function renderProveedores() {
     if (!PROV.length) { document.getElementById("proveedores").hidden = true; return; }
     var rows = PROV.map(function (p) {
@@ -1637,6 +1751,7 @@ PLANTILLA = r"""<title>Licitaciones de Neumáticos</title>
   renderMeta();
   renderTabCounts();
   renderResumen();
+  renderPortales();
   renderProveedores();
   render();
 })();

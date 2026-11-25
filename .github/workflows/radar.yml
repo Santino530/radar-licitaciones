@@ -49,12 +49,26 @@ jobs:
             git commit -m "Radar: corrida $(date -u +'%Y-%m-%d %H:%M UTC')"
             # si alguien pusheo mientras corria (backfill, sesion interactiva),
             # reintenta con rebase antes de rendirse.
-            for intento in 1 2 3; do
-              if git push; then break; fi
-              echo "push rechazado, intento $intento: pull --rebase y reintento"
-              git pull --rebase origin main
-              sleep 5
-            done
+            bash scripts/pushear.sh
+          fi
+
+      # Mail con las licitaciones nuevas que pasan los chequeos (ver
+      # scripts/alerta_mail.py). Va DESPUES de guardar el radar: si el envio
+      # falla, el paso queda en rojo pero la corrida ya quedo guardada.
+      # Sin los secretos ALERTA_* no manda nada (solo lo dice en el log).
+      - name: Avisar por mail las licitaciones nuevas
+        env:
+          ALERTA_SMTP_HOST: ${{ secrets.ALERTA_SMTP_HOST }}
+          ALERTA_SMTP_PORT: ${{ secrets.ALERTA_SMTP_PORT }}
+          ALERTA_SMTP_USER: ${{ secrets.ALERTA_SMTP_USER }}
+          ALERTA_SMTP_PASS: ${{ secrets.ALERTA_SMTP_PASS }}
+          ALERTA_PARA: ${{ secrets.ALERTA_PARA }}
+        run: |
+          python scripts/alerta_mail.py
+          if [ -f data/alertas_enviadas.csv ]; then git add data/alertas_enviadas.csv; fi
+          if ! git diff --cached --quiet; then
+            git commit -m "Radar: alertas enviadas $(date -u +'%Y-%m-%d %H:%M UTC')"
+            bash scripts/pushear.sh
           fi
 
       # docs/index.html se sirve como GitHub Pages -> link publico que se

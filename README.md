@@ -25,8 +25,11 @@ organismos del sector estatal argentino (foco AMBA + Provincia de Buenos Aires).
      proveedores y que publican sus licitaciones ahí: **Lanús** (Documentos
      oficiales → Licitaciones Públicas/Privadas del año; Lanús no está en SIBOM) y
      **San Isidro** (www.sanisidro.gob.ar/compras + la ficha de cada licitación para la
-     fecha de apertura). Esteban Echeverría no tiene listado propio: publica en el
-     boletín, que ya cubre SIBOM.
+     fecha de apertura), **Avellaneda** (mda.gob.ar/tramites/licitaciones),
+     **Florencio Varela** (varela.gob.ar/lic) y **Berazategui** (entradas de su web +
+     el PDF de cada llamado, de donde sale objeto y apertura). Esteban Echeverría no
+     tiene listado propio: publica en el boletín, que ya cubre SIBOM. El relevamiento
+     de qué publica cada municipio está en `data/fuentes_objetivo.csv`.
 2. **Filtros** — palabras clave del rubro + descarte de falsos positivos (cámara de
    video, batería de generador, recapado asfáltico de calzada, etc.). Cada licitación
    se clasifica en *vigente* / *cerrada* / *descartada* y caduca sola cuando pasa la
@@ -59,7 +62,7 @@ src/
   bac_mvp.py      conector BAC
   comprar_mvp.py  conector COMPR.AR (Nación)
   corredores_mvp.py  conector Corredores Viales S.A.
-  municipios_web_mvp.py  conector webs municipales (Lanús, San Isidro)
+  municipios_web_mvp.py  conector webs municipales (Lanús, San Isidro, Avellaneda, F. Varela, Berazategui)
 scripts/build_dashboard.py    arma el panel HTML desde los CSV
 data/
   radar_sin_verificar.csv     salida del motor
@@ -67,7 +70,7 @@ data/
   municipios_inscriptos.csv   municipios donde ya somos proveedores + cómo compran
   proveedores_conocidos.csv   adjudicatarios detectados (dato de boletines oficiales)
   fuentes_objetivo.csv · sibom_city_ids.csv
-  certs/                      certificado intermedio que la web de San Isidro no envía
+  certs/                      intermedios Sectigo que algunas webs municipales no envían
 docs/index.html               el panel (GitHub Pages)
 web/dashboard.html            misma página, versión para publicar como Artifact
 ```
